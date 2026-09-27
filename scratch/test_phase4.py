@@ -24,6 +24,7 @@ scorer weights so this is just for the scoring stage).
 import sys
 import threading
 import time
+import json
 
 sys.path.insert(0, ".")  # allow running from repo root
 
@@ -92,6 +93,17 @@ def read_loop():
                 f"(dt={result.get('dt_ms', 0):.0f}ms, path_len={result.get('path_len', 0):.2f})"
             )
             print(f"    top-{len(candidates)}: {candidates_str}")
+
+            # Log this gesture for scratch/visualize_swipe.py to plot.
+            try:
+                with open("scratch/last_swipe.json", "w") as f:
+                    json.dump({
+                        "decoded_word": decoded,
+                        "candidates": candidates,
+                        "key_space_path": result.get("key_space_path", []),
+                    }, f)
+            except OSError as e:
+                print(f"    (could not write swipe log: {e})")
 
 
 def main():

@@ -138,6 +138,7 @@ class GestureSegmenter:
         return {
             "type": "word",
             "path": path,
+            "key_space_path": key_space_path,
             "decoded_word": decoded_word,
             "candidates": candidates,
             "dt_ms": dt_ms,
