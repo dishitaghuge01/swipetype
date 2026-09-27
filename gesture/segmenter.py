@@ -4,25 +4,19 @@ gesture/segmenter.py
 Gesture segmenter (PRD section 7.7). Consumes (slot, event_type) events
 from TouchpadCapture and, once ALL fingers in a touch group have
 lifted, classifies the completed gesture as a flick (char/word delete)
-or a word gesture, based on duration and net displacement in key-space.
+or a word gesture.
 
-Fix note: classification happens once per touch GROUP, not once per
-individual finger. Two fingers in a real two-finger flick rarely lift
-at the exact same instant, so classifying on each finger's own lift
-event double-fires (first lift sees both fingers still active ->
-word_delete, second lift sees only itself -> char_delete). Waiting for
-the active-slot set to fully empty before classifying, and using the
-peak concurrent finger count observed during the touch, fixes this
-without relying on a fragile time-window guess.
-
-Phase 3: classification only. Decoding (Phase 4) and injection
-(Phase 5) wire into handle_event()'s return value later without
-changing this module's public interface.
+Phase 4 update: word gestures are now decoded via decoder/scorer.py
+into an actual word (plus top-k debug candidates), instead of just
+returning the raw path. Injection (Phase 5) wires into the returned
+"decoded_word" field later without changing this module's interface.
 """
 
 from typing import Dict, List, Optional, Set, Tuple
 
 from decoder.geometry import to_key_space
+from decoder.resample import resample_path, N_RESAMPLE
+from decoder.scorer import decode as decoder_decode
 
 # PRD section 7.7 defaults, config-overridable in a later phase
 FLICK_MAX_DURATION_MS = 150
@@ -31,7 +25,18 @@ FLICK_MAX_DY = 0.3    # key-units; net y-displacement must stay under this (roug
 
 
 class GestureSegmenter:
-    def __init__(self):
+    def __init__(self, dictionary: Optional[Dict[str, dict]] = None,
+                 n_resample: int = N_RESAMPLE, debug_top_k: int = 5):
+        """
+        dictionary: output of decoder.dictionary.load_dictionary(). If
+        None, word gestures fall back to returning the raw path with
+        decoded_word=None (useful for testing before Phase 4's
+        dictionary is wired in, or if it failed to load).
+        """
+        self.dictionary = dictionary
+        self.n_resample = n_resample
+        self.debug_top_k = debug_top_k
+
         # Slots currently held down together.
         self._active_slots: Set[int] = set()
 
@@ -84,6 +89,8 @@ class GestureSegmenter:
             return {
                 "type": "word",
                 "path": path,
+                "decoded_word": None,
+                "candidates": [],
                 "reason": "path too short to classify, defaulting to word",
             }
 
@@ -117,9 +124,22 @@ class GestureSegmenter:
                 "path_len": path_len,
             }
 
+        # Word gesture: resample into key-space and decode.
+        gesture_resampled = resample_path(key_space_path, self.n_resample)
+
+        candidates: List[Tuple[str, float]] = []
+        decoded_word: Optional[str] = None
+
+        if self.dictionary is not None:
+            candidates = decoder_decode(gesture_resampled, self.dictionary, top_k=self.debug_top_k)
+            if candidates:
+                decoded_word = candidates[0][0]
+
         return {
             "type": "word",
             "path": path,
+            "decoded_word": decoded_word,
+            "candidates": candidates,
             "dt_ms": dt_ms,
             "dx": dx,
             "dy": dy,
