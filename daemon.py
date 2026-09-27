@@ -18,9 +18,9 @@ Ctrl+C in this terminal to stop.
 """
 
 import os
+import signal
 import sys
 import threading
-import time
 
 sys.path.insert(0, ".")  # allow running from repo root
 
@@ -154,17 +154,27 @@ class SwipeTypeDaemon:
     def run(self) -> None:
         self.listener.start()
         print(f"Socket listening at: {self.listener.socket_path}")
-        print("Daemon idle. Run cli/swipetype_toggle.py to switch modes. Ctrl+C to stop.")
+        print("Daemon idle. Run cli/swipetype_toggle.py to switch modes.")
 
         reader_thread = threading.Thread(target=self._read_loop, daemon=True)
         reader_thread.start()
 
-        try:
-            while True:
-                time.sleep(0.5)
-        except KeyboardInterrupt:
-            print("\nStopping.")
-            self.listener.stop()
+        # Ctrl+C sends SIGINT when run in a terminal; `systemctl --user
+        # stop` sends SIGTERM. The original KeyboardInterrupt-only
+        # handling caught the former but not the latter, so a systemd
+        # stop wouldn't run listener.stop() cleanly. One handler for
+        # both, gating the main loop with an Event instead.
+        stop_event = threading.Event()
+
+        def _handle_signal(signum, frame) -> None:
+            print(f"\nReceived signal {signum}, stopping.")
+            stop_event.set()
+
+        signal.signal(signal.SIGINT, _handle_signal)
+        signal.signal(signal.SIGTERM, _handle_signal)
+
+        stop_event.wait()
+        self.listener.stop()
 
 
 def main() -> None:

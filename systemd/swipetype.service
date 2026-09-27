@@ -1,0 +1,18 @@
+[Unit]
+Description=SwipeType gesture-to-text daemon
+# Adjust the unit name here if `systemctl --user list-unit-files |
+# grep -i ydotool` shows something other than ydotoold.service.
+After=ydotoold.service
+Wants=ydotoold.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/swipetype
+ExecStart=%h/swipetype/.venv/bin/python %h/swipetype/daemon.py
+Environment=XDG_SESSION_TYPE=wayland
+Environment=XDG_RUNTIME_DIR=%t
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
