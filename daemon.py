@@ -35,6 +35,7 @@ from inject.base import TextInjector
 from inject.xdotool_injector import XdotoolInjector
 from inject.ydotool_injector import YdotoolInjector
 from config import load_config
+from overlay.broadcaster import OverlayBroadcaster
 
 
 def select_injector() -> TextInjector:
@@ -72,6 +73,14 @@ class SwipeTypeDaemon:
         self.segmenter = GestureSegmenter(dictionary=self.dictionary)
         self.injector = select_injector()
 
+        # v2 section 8.4: OverlayBroadcaster is a separate optional
+        # process's IPC channel. Wired as attributes (not constructor
+        # args) so GestureSegmenter.__init__'s call site elsewhere
+        # doesn't need to change — purely additive.
+        self.overlay = OverlayBroadcaster()
+        self.segmenter.on_gesture_start = self.overlay.broadcast_clear
+        self.segmenter.on_point = self.overlay.broadcast_point
+
         # PRD section 8, Phase 5, revised after the char/word-delete
         # desync bug: each entry is the text of a committed unit
         # (word + its trailing space) that is STILL PRESENT in the
@@ -90,6 +99,10 @@ class SwipeTypeDaemon:
         self.capture.set_mode(self.swipe_mode)
         state = "SWIPE_MODE (grabbed)" if self.swipe_mode else "IDLE (ungrabbed)"
         print(f"[toggle] now: {state}")
+
+        self.overlay.broadcast_mode(self.swipe_mode)
+        if not self.swipe_mode:
+            self.overlay.broadcast_clear()
 
     def _consume_from_history(self, n: int) -> None:
         """Trim n characters off the tail of the most recent history
@@ -134,6 +147,7 @@ class SwipeTypeDaemon:
 
         self.injector.commit_word(decoded)
         self._history.append(decoded + " ")  # include the trailing space commit_word() types
+        self.overlay.broadcast_commit(decoded)
 
     def _read_loop(self) -> None:
         for slot, event_type in self.capture.read_events():
@@ -156,6 +170,10 @@ class SwipeTypeDaemon:
     def run(self) -> None:
         self.listener.start()
         print(f"Socket listening at: {self.listener.socket_path}")
+
+        self.overlay.start()
+        print(f"Overlay socket listening at: {self.overlay.socket_path}")
+
         print("Daemon idle. Run cli/swipetype_toggle.py to switch modes.")
 
         reader_thread = threading.Thread(target=self._read_loop, daemon=True)
@@ -177,6 +195,7 @@ class SwipeTypeDaemon:
 
         stop_event.wait()
         self.listener.stop()
+        self.overlay.stop()
 
 
 def main() -> None:

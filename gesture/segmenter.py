@@ -10,9 +10,15 @@ Phase 4 update: word gestures are now decoded via decoder/scorer.py
 into an actual word (plus top-k debug candidates), instead of just
 returning the raw path. Injection (Phase 5) wires into the returned
 "decoded_word" field later without changing this module's interface.
+
+v2 section 8.3: two optional constructor callbacks, on_gesture_start
+and on_point, let an external listener (the OverlayBroadcaster, via
+daemon.py) observe a gesture live as it happens, for the ghost
+overlay's real-time trace. Purely additive — when both are None
+(the default), behavior is identical to Phase 5.
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from decoder.geometry import to_key_space
 from decoder.resample import resample_path, N_RESAMPLE
@@ -26,16 +32,27 @@ FLICK_MAX_DY = 0.3    # key-units; net y-displacement must stay under this (roug
 
 class GestureSegmenter:
     def __init__(self, dictionary: Optional[Dict[str, dict]] = None,
-                 n_resample: int = N_RESAMPLE, debug_top_k: int = 5):
+                 n_resample: int = N_RESAMPLE, debug_top_k: int = 5,
+                 on_gesture_start: Optional[Callable[[], None]] = None,
+                 on_point: Optional[Callable[[float, float], None]] = None):
         """
         dictionary: output of decoder.dictionary.load_dictionary(). If
         None, word gestures fall back to returning the raw path with
         decoded_word=None (useful for testing before Phase 4's
         dictionary is wired in, or if it failed to load).
+
+        on_gesture_start: called with no args exactly once per touch
+        group, when the group transitions from empty to non-empty
+        (i.e. on the first finger_down of a new gesture).
+
+        on_point: called with (kx, ky) key-space coordinates on every
+        move event, so an external listener can render a live trace.
         """
         self.dictionary = dictionary
         self.n_resample = n_resample
         self.debug_top_k = debug_top_k
+        self.on_gesture_start = on_gesture_start
+        self.on_point = on_point
 
         # Slots currently held down together.
         self._active_slots: Set[int] = set()
@@ -54,11 +71,17 @@ class GestureSegmenter:
         TouchpadCapture.read_events(). Returns a classification dict
         once all fingers in a touch group have lifted, else None."""
         if event_type == "finger_down":
+            if not self._active_slots and self.on_gesture_start is not None:
+                self.on_gesture_start()
             self._active_slots.add(slot)
             self._peak_concurrent = max(self._peak_concurrent, len(self._active_slots))
             return None
 
         if event_type == "move":
+            if self.on_point is not None and slot in capture.active_fingers:
+                x_norm, y_norm, _ts = capture.active_fingers[slot][-1]
+                kx, ky = to_key_space(x_norm, y_norm)
+                self.on_point(kx, ky)
             return None
 
         if event_type == "finger_up":
