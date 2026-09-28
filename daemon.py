@@ -8,8 +8,11 @@ process — decoded words and delete flicks are now injected into
 whatever application currently has focus, instead of only being
 printed to the console.
 
-Set DEVICE_PATH below to your trackpad's device path (see
-scratch/list_devices.py from Phase 1 if you need to re-find it).
+v2 (PRD section 7, FR-DEV): the device path is no longer hardcoded.
+main() loads config.yaml via config.load_config() and either uses its
+device_path override or auto-detects the trackpad via
+capture.touchpad.find_touchpad_device(). See config.yaml to set an
+explicit override if auto-detection ever picks the wrong device.
 
 Run: python daemon.py
 Toggle swipe mode from another terminal (or your bound shortcut):
@@ -24,15 +27,14 @@ import threading
 
 sys.path.insert(0, ".")  # allow running from repo root
 
-from capture.touchpad import TouchpadCapture
+from capture.touchpad import TouchpadCapture, find_touchpad_device
 from capture.socket_listener import SocketListener
 from gesture.segmenter import GestureSegmenter
 from decoder.dictionary import load_dictionary
 from inject.base import TextInjector
 from inject.xdotool_injector import XdotoolInjector
 from inject.ydotool_injector import YdotoolInjector
-
-DEVICE_PATH = "/dev/input/event10"  # from Phase 1 — adjust to your trackpad
+from config import load_config
 
 
 def select_injector() -> TextInjector:
@@ -178,7 +180,11 @@ class SwipeTypeDaemon:
 
 
 def main() -> None:
-    daemon = SwipeTypeDaemon(DEVICE_PATH)
+    cfg = load_config()
+    device_path = cfg["device_path"] or find_touchpad_device()
+    print(f"Using touchpad device: {device_path}")
+
+    daemon = SwipeTypeDaemon(device_path)
     daemon.run()
 
 

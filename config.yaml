@@ -1,0 +1,4 @@
+device_path: null
+
+ghost_overlay:
+  enabled: true

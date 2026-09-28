@@ -5,10 +5,66 @@ Capture layer for SwipeType (PRD section 7.2). Reads raw multitouch
 events from the trackpad evdev device, normalizes coordinates to 0-1
 range, and exposes a grab/ungrab mode switch so the OS cursor doesn't
 move while SwipeType owns the trackpad.
+
+v2 (PRD FR-DEV): also provides find_touchpad_device() for
+auto-detecting the trackpad's device path instead of requiring a
+hardcoded one, since the hardcoded path only worked on the original
+dev machine.
 """
 
 import evdev
 from evdev import ecodes
+
+
+def find_touchpad_device() -> str:
+    """
+    Auto-detect the trackpad's evdev device path (PRD FR-DEV). Scans
+    all input devices, filters to ones exposing BOTH multitouch
+    position axes AND the INPUT_PROP_BUTTONPAD device property — the
+    same property libinput itself uses to distinguish a touchpad from
+    a touchscreen or drawing tablet, which also expose
+    ABS_MT_POSITION_X/Y but not this property.
+
+    Verified API (python-evdev 2.0.0): InputDevice.input_props()
+    returns a list of int property codes; ecodes.INPUT_PROP_BUTTONPAD
+    == 2.
+
+    Raises RuntimeError with a clear message if zero or multiple
+    matches are found, listing the candidates in the multiple-match
+    case so the user knows what to put in config.yaml's device_path.
+    """
+    matches = []
+    for path in evdev.list_devices():
+        try:
+            dev = evdev.InputDevice(path)
+            caps = dev.capabilities()
+            abs_codes = {code for code, _ in caps.get(ecodes.EV_ABS, [])}
+            has_mt_position = (
+                ecodes.ABS_MT_POSITION_X in abs_codes
+                and ecodes.ABS_MT_POSITION_Y in abs_codes
+            )
+            is_buttonpad = ecodes.INPUT_PROP_BUTTONPAD in dev.input_props()
+        except (OSError, PermissionError):
+            continue  # not readable (permissions, or device vanished) — skip
+
+        if has_mt_position and is_buttonpad:
+            matches.append((path, dev.name))
+
+    if len(matches) == 0:
+        raise RuntimeError(
+            "No touchpad device found (looked for ABS_MT_POSITION_X/Y + "
+            "INPUT_PROP_BUTTONPAD). Set device_path explicitly in "
+            "config.yaml. Run scratch/list_devices.py to see all input "
+            "devices and their capabilities."
+        )
+    if len(matches) > 1:
+        listed = ", ".join(f"{p} ({name})" for p, name in matches)
+        raise RuntimeError(
+            f"Multiple touchpad-like devices found: {listed}. "
+            f"Set device_path explicitly in config.yaml to disambiguate."
+        )
+
+    return matches[0][0]
 
 
 class TouchpadCapture:
