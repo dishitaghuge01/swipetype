@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SwipeType Ghost Overlay</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage">
+    <div id="keys"></div>
+    <canvas id="comet"></canvas>
+    <div id="flash"></div>
+    <div id="layout-ui">
+      <div id="scrim"></div>
+      <div id="outline">
+        <div class="handle" data-handle="tl"></div>
+        <div class="handle" data-handle="tr"></div>
+        <div class="handle" data-handle="bl"></div>
+        <div class="handle" data-handle="br"></div>
+      </div>
+      <div id="toolbar">
+        <button data-action="fit">Fit screen</button>
+        <button data-action="reset">Reset</button>
+        <button data-action="done" class="primary">Done</button>
+      </div>
+    </div>
+  </div>
+  <script src="demo/keys.js"></script>
+  <script src="demo/demo-path.js"></script>
+  <script src="overlay.js"></script>
+</body>
+</html>
