@@ -15,12 +15,11 @@ connecting as a client to daemon.py's OverlayBroadcaster Unix socket
 Path A only: requires a wlr-layer-shell compositor (Sway, Hyprland,
 river, labwc). Will fail to init on GNOME/KDE — see v2 PRD NG1.
 
-STAGE 2d: webview + layer-shell + init() wiring only. The real-time
-socket -> JS event bridge (section 8.6's batching) lands in stage 2e;
-the IDLE/SWIPE/LAYOUT mode state machine lands in stage 2f; the
+STAGE 2e: webview + layer-shell + init() wiring, plus the real-time
+socket -> JS event bridge (section 8.6's _enqueue/_flush batching).
+The IDLE/SWIPE/LAYOUT mode state machine lands in stage 2f; the
 draggable layout mode lands in stage 2g. For now, swipe mode is forced
-on at startup so this stage's own check (full-screen, transparent,
-click-through, real KEY_CENTERS) can be verified on its own.
+on at startup and the input region is always empty, as placeholders.
 
 Fix history, proven in scratch/spike_webkit.py (Stage 2a, not shipped):
   - gtk4-layer-shell must be ctypes-loaded into the process's GLOBAL
@@ -99,6 +98,11 @@ STAGE_BOUNDS = {"xmin": -0.75, "xmax": 10.0, "ymin": -0.75, "ymax": 2.75}
 
 DEV_MODE = bool(os.environ.get("SWIPETYPE_OVERLAY_DEV"))
 
+# PRD section 8.6: cap the pre-page-ready queue so a stalled load can't
+# grow memory unbounded. Only 'point' events are capped/dropped;
+# clear/commit/mode are never dropped.
+MAX_PENDING_POINTS = 500
+
 
 class OverlayApp(Gtk.Application):
     def __init__(self):
@@ -108,6 +112,8 @@ class OverlayApp(Gtk.Application):
 
         self.swipe_mode = False
         self._page_ready = False
+        self._pending: list[dict] = []     # events queued for the next JS flush
+        self._flush_id: int | None = None  # GLib.timeout_add id, or None if no flush is scheduled
 
         self.cfg = load_config()  # acted on starting stage 2f (lazy creation gating)
 
@@ -157,7 +163,7 @@ class OverlayApp(Gtk.Application):
         )
 
         # UserContentManager + script message handler: not used for
-        # anything yet in stage 2d (layout-mode messages arrive in
+        # anything yet in stage 2e (layout-mode messages arrive in
         # stage 2g), but wired up now since it must exist before the
         # WebView is constructed.
         ucm = WebKit.UserContentManager()
@@ -191,7 +197,7 @@ class OverlayApp(Gtk.Application):
         self.window.set_child(self.webview)
         self.window.connect("map", self._on_map)
 
-        # Stage 2d: force-shown at startup, unconditionally. Lazy
+        # Stage 2e: force-shown at startup, unconditionally. Lazy
         # creation based on ghost_overlay.enabled, and the real
         # IDLE/SWIPE/LAYOUT state machine, land in stage 2f.
         self.window.set_visible(True)
@@ -203,7 +209,7 @@ class OverlayApp(Gtk.Application):
     def _on_map(self, _widget) -> None:
         surface = self.window.get_surface()
         if surface is not None:
-            # Stage 2d: always click-through. The real mode-driven
+            # Stage 2e: always click-through. The real mode-driven
             # input-region switching (empty in SWIPE, full in LAYOUT)
             # lands in stage 2f.
             surface.set_input_region(cairo.Region())
@@ -240,12 +246,17 @@ class OverlayApp(Gtk.Application):
         )
         webview.evaluate_javascript(init_js, -1, None, None, None, None)
 
-        # Stage 2d step 3: force swipe mode on at startup so this
-        # stage's check (keys visible, positioned, click-through) can
-        # be verified without the daemon or the socket bridge running.
-        # The real mode state machine replaces this in stage 2f.
+        # Stage 2d/2e step: force swipe mode on at startup so this
+        # stage's checks can be verified without a full mode state
+        # machine. The real state machine replaces this in stage 2f.
         self.swipe_mode = True
         webview.evaluate_javascript('window.swipetype.setMode("swipe");', -1, None, None, None, None)
+
+        # Drain anything that arrived over the socket before the page
+        # finished loading (unlikely in practice, since daemon.py
+        # usually isn't even running yet at this point, but correct
+        # per PRD section 8.6 either way).
+        GLib.idle_add(self._flush)
 
         if DEV_MODE:
             print("[swipetype-overlay] page load FINISHED; init() + setMode('swipe') sent.")
@@ -308,13 +319,47 @@ class OverlayApp(Gtk.Application):
 
             time.sleep(RECONNECT_INTERVAL_S)
 
+    # ---- Event bridge: socket -> JS, batched (PRD section 8.6) ----
+
     def _handle_event(self, event: dict) -> bool:
-        # Stage 2d: received and logged only. The real batched
-        # dispatch into window.swipetype.events([...]) -- per PRD
-        # section 8.6's _enqueue/_flush -- is built in stage 2e.
-        if DEV_MODE:
-            print(f"[swipetype-overlay] socket event (not yet dispatched to JS): {event}")
+        self._enqueue(event)
         return False  # GLib.idle_add: don't repeat this call
+
+    def _enqueue(self, event: dict) -> None:
+        self._pending.append(event)
+
+        # Cap the pre-ready queue: drop the OLDEST 'point' events once
+        # there are more than MAX_PENDING_POINTS pending, so a stalled
+        # page load can't let this grow unbounded. Never drop
+        # 'clear'/'commit'/'mode' events, and preserve relative order
+        # of everything kept.
+        if not self._page_ready:
+            total_points = sum(1 for e in self._pending if e.get("event") == "point")
+            excess = total_points - MAX_PENDING_POINTS
+            if excess > 0:
+                trimmed = []
+                points_dropped = 0
+                for e in self._pending:
+                    if e.get("event") == "point" and points_dropped < excess:
+                        points_dropped += 1
+                        continue
+                    trimmed.append(e)
+                self._pending = trimmed
+
+        if self._flush_id is None:
+            self._flush_id = GLib.timeout_add(10, self._flush)
+
+    def _flush(self) -> bool:
+        self._flush_id = None
+        if not (self._page_ready and self._pending):
+            return False  # keep events queued until the page is ready; don't repeat this timeout
+        batch, self._pending = self._pending, []
+        if DEV_MODE:
+            kinds = [e.get("event") for e in batch]
+            print(f"[swipetype-overlay] flushing {len(batch)} event(s) to JS: {kinds}")
+        js = f"window.swipetype.events({json.dumps(batch)});"
+        self.webview.evaluate_javascript(js, -1, None, None, None, None)
+        return False  # one-shot timeout; _enqueue() schedules the next one as needed
 
 
 def main() -> None:
