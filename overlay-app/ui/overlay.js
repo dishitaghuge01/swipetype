@@ -7,21 +7,23 @@
  * index.html?demo (section 8.8) using demo/keys.js + demo/demo-path.js.
  *
  * STAGE 2b: key generation + coordinate mapping + demo bootstrap.
- * STAGE 2c (this version): comet renderer + word flash + demo
- * playback loop. events() now actually does something.
+ * STAGE 2c: comet renderer + demo playback loop.
+ * STAGE 2g (this version): layout mode -- drag to move, aspect-locked
+ * corner-handle resize, Fit screen / Reset / Done toolbar, persisted
+ * via postMessage to the Python host (section 8.7.6).
  */
 
 (function () {
   "use strict";
 
   // ---- comet tunables (PRD section 8.7.4) -- all in one place ----
-  const TRAIL_MS = 420;          // how long a point stays in the tail
-  const HEAD_WIDTH_U = 0.13;     // stroke width at the head, in key-units
-  const TAIL_WIDTH_U = 0.02;     // stroke width at the tail, in key-units
-  const SMOOTHING = 0.55;        // head lerp factor, removes touchpad jitter
+  const TRAIL_MS = 420;
+  const HEAD_WIDTH_U = 0.13;
+  const TAIL_WIDTH_U = 0.02;
+  const SMOOTHING = 0.55;
   const GLOW_COLOR = "rgba(140, 190, 255, 0.85)";
-  const GLOW_BLUR_U = 0.10;      // shadowBlur radius, in key-units
-  const HEAD_DISC_FRESH_MS = 80; // head glow disc shows while last point < this old
+  const GLOW_BLUR_U = 0.10;
+  const HEAD_DISC_FRESH_MS = 80;
 
   // ---- module state ----
   let KEYS = {};       // letter -> [kx, ky]
@@ -29,40 +31,54 @@
   let LAYOUT = null;   // {cx, cy, w} or null = fit-to-screen ("contain")
   let lastRect = null; // most recent computeLayoutRect() result
 
-  let cometPoints = [];        // [{kx, ky, t}], t = performance.now()
-  let cometHeadKx = null;      // smoothed head, in key-space
+  let cometPoints = [];
+  let cometHeadKx = null;
   let cometHeadKy = null;
   let cometRafId = null;
+
+  let dragState = null; // {type:'move'|'resize', handle, pointerId, ...}
 
   const stageEl = document.getElementById("stage");
   const keysEl = document.getElementById("keys");
   const cometCanvas = document.getElementById("comet");
   const cometCtx = cometCanvas.getContext("2d");
   const flashEl = document.getElementById("flash");
+  const outlineEl = document.getElementById("outline");
+  const toolbarEl = document.getElementById("toolbar");
 
   // ---- coordinate mapping (PRD section 8.7.2 -- single source of truth) ----
 
-  function computeLayoutRect() {
+  function computeDefaultLayoutValues() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const stageW = STAGE.xmax - STAGE.xmin;
     const stageH = STAGE.ymax - STAGE.ymin;
     const aspect = stageW / stageH;
+    const w = Math.min(1, (vh / vw) * aspect);
+    return { cx: 0.5, cy: 0.5, w };
+  }
 
-    let w, cx, cy;
-    if (LAYOUT) {
-      w = Math.min(1, Math.max(0.2, LAYOUT.w));
-      cx = LAYOUT.cx;
-      cy = LAYOUT.cy;
-    } else {
-      w = Math.min(1, (vh / vw) * aspect);
-      cx = 0.5;
-      cy = 0.5;
-    }
+  function getCurrentLayoutValues() {
+    return LAYOUT ? { ...LAYOUT } : computeDefaultLayoutValues();
+  }
+
+  function clamp(v, lo, hi) {
+    return Math.min(hi, Math.max(lo, v));
+  }
+
+  function computeLayoutRect() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const stageW = STAGE.xmax - STAGE.xmin;
+
+    const layout = getCurrentLayoutValues();
+    const w = clamp(layout.w, 0.2, 1);
+    const cx = layout.cx;
+    const cy = layout.cy;
 
     const W_px = w * vw;
     const u = W_px / stageW;
-    const H_px = stageH * u;
+    const H_px = (STAGE.ymax - STAGE.ymin) * u;
 
     return {
       left: cx * vw - W_px / 2,
@@ -159,7 +175,7 @@
     const alpha = Math.pow(1 - age, 1.5);
     if (alpha <= 0.01) return;
 
-    const widthFrac = 1 - age; // 1 at head, 0 at tail
+    const widthFrac = 1 - age;
     const baseWidth = (TAIL_WIDTH_U + (HEAD_WIDTH_U - TAIL_WIDTH_U) * widthFrac) * u;
 
     cometCtx.beginPath();
@@ -186,11 +202,6 @@
       strokeQuad(pxPoints[0], pxPoints[0], pxPoints[1], pxPoints[1].t, now, u, isGlow);
       return;
     }
-    // Standard smooth-polyline technique (PRD section 8.7.4): each
-    // interior point is a Bezier control point between the midpoints
-    // of its neighboring segments -- no visible corners, and each
-    // little quad segment can still be given its own width/alpha so
-    // the taper-by-age effect works.
     for (let i = 1; i < n - 1; i++) {
       const prevMid = midpoint(pxPoints[i - 1], pxPoints[i]);
       const nextMid = midpoint(pxPoints[i], pxPoints[i + 1]);
@@ -213,8 +224,8 @@
         t: p.t,
       }));
 
-      drawCometPass(pxPoints, now, u, true);  // wide, low-alpha glow pass
-      drawCometPass(pxPoints, now, u, false); // narrow, bright core pass
+      drawCometPass(pxPoints, now, u, true);
+      drawCometPass(pxPoints, now, u, false);
 
       const last = pxPoints[pxPoints.length - 1];
       if (now - last.t < HEAD_DISC_FRESH_MS) {
@@ -234,20 +245,144 @@
     }
   }
 
-  // ---- word flash (PRD section 8.7.4, CSS transition) ----
+  // ---- word flash (disabled by design -- see stage 2c follow-up) ----
 
-  function showWordFlash(word) {
-    if (!lastRect || cometHeadKx === null) return;
-    const u = lastRect.u;
-    const px = (cometHeadKx - STAGE.xmin) * u;
-    const py = (cometHeadKy - STAGE.ymin) * u;
-    flashEl.textContent = word;
-    flashEl.style.left = px + "px";
-    flashEl.style.top = py - u * 0.9 + "px"; // sits a bit above the swipe end
-    flashEl.classList.remove("show");
-    void flashEl.offsetWidth; // force reflow so the CSS animation restarts
-    flashEl.classList.add("show");
+  function showWordFlash(_word) {
+    // Intentionally a no-op: the committed word already appears in
+    // the real focused text field, so flashing it again here would be
+    // redundant. Left in place (unused) in case this is revisited.
   }
+
+  // ---- host bridge (outbound) ----
+
+  function sendToHost(payload) {
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.swipetype) {
+      window.webkit.messageHandlers.swipetype.postMessage(payload);
+    } else {
+      console.log("[swipetype demo] would send to host:", payload);
+    }
+  }
+
+  function sendLayoutToHost() {
+    sendToHost({ type: "layout", layout: getCurrentLayoutValues() });
+  }
+
+  // ---- layout mode: drag to move, corner-handle resize (PRD 8.7.6) ----
+
+  function onStagePointerDown(e) {
+    if (document.body.dataset.mode !== "layout") return;
+    if (e.target.closest(".handle")) return; // handles have their own listener
+    e.preventDefault();
+    dragState = {
+      type: "move",
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startLayout: getCurrentLayoutValues(),
+    };
+    stageEl.setPointerCapture(e.pointerId);
+  }
+
+  function onHandlePointerDown(e) {
+    if (document.body.dataset.mode !== "layout") return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const handle = e.currentTarget.dataset.handle;
+    const rect = computeLayoutRect();
+
+    // The anchor is the OPPOSITE corner, in viewport px -- it must
+    // stay fixed while the dragged corner follows the pointer.
+    const anchors = {
+      tl: { x: rect.left + rect.width, y: rect.top + rect.height },
+      tr: { x: rect.left, y: rect.top + rect.height },
+      bl: { x: rect.left + rect.width, y: rect.top },
+      br: { x: rect.left, y: rect.top },
+    };
+
+    dragState = {
+      type: "resize",
+      handle,
+      pointerId: e.pointerId,
+      anchor: anchors[handle],
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e) {
+    if (!dragState) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    if (dragState.type === "move") {
+      const dx = e.clientX - dragState.startClientX;
+      const dy = e.clientY - dragState.startClientY;
+      // Clamping cx/cy (the stage CENTER, as a fraction of the
+      // viewport) to [0, 1] guarantees at least half the stage stays
+      // on screen on every edge, regardless of its width -- PRD
+      // 8.7.6's "at least 50% of the stage must stay on screen".
+      const newCx = clamp(dragState.startLayout.cx + dx / vw, 0, 1);
+      const newCy = clamp(dragState.startLayout.cy + dy / vh, 0, 1);
+      LAYOUT = { cx: newCx, cy: newCy, w: dragState.startLayout.w };
+      relayout();
+      return;
+    }
+
+    if (dragState.type === "resize") {
+      const stageW = STAGE.xmax - STAGE.xmin;
+      const stageH = STAGE.ymax - STAGE.ymin;
+      const aspect = stageW / stageH; // locked -- square keys are the point
+      const anchor = dragState.anchor;
+
+      let W_px = Math.abs(e.clientX - anchor.x);
+      W_px = clamp(W_px, 0.2 * vw, vw);
+      const H_px = W_px / aspect;
+
+      let left, top;
+      if (dragState.handle === "br") { left = anchor.x; top = anchor.y; }
+      else if (dragState.handle === "bl") { left = anchor.x - W_px; top = anchor.y; }
+      else if (dragState.handle === "tr") { left = anchor.x; top = anchor.y - H_px; }
+      else { left = anchor.x - W_px; top = anchor.y - H_px; } // "tl"
+
+      const newCx = clamp((left + W_px / 2) / vw, 0, 1);
+      const newCy = clamp((top + H_px / 2) / vh, 0, 1);
+      const newW = clamp(W_px / vw, 0.2, 1.0);
+
+      LAYOUT = { cx: newCx, cy: newCy, w: newW };
+      relayout();
+    }
+  }
+
+  function onPointerUp(_e) {
+    if (!dragState) return;
+    dragState = null;
+    sendLayoutToHost(); // one message per drag, on release -- not per-move
+  }
+
+  stageEl.addEventListener("pointerdown", onStagePointerDown);
+  document.querySelectorAll(".handle").forEach((h) => {
+    h.addEventListener("pointerdown", onHandlePointerDown);
+  });
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+
+  toolbarEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+
+    if (action === "fit") {
+      LAYOUT = computeDefaultLayoutValues();
+      relayout();
+      sendLayoutToHost();
+    } else if (action === "reset") {
+      LAYOUT = null;
+      relayout();
+      sendToHost({ type: "layout-reset" });
+    } else if (action === "done") {
+      sendToHost({ type: "layout-done" });
+    }
+  });
 
   // ---- public API (PRD section 8.6) ----
 
@@ -266,13 +401,8 @@
         } else if (ev.event === "clear") {
           clearComet();
         } else if (ev.event === "commit") {
-          // Word flash disabled by design: the committed word already
-          // appears in the real focused text field (chat input, etc.),
-          // so flashing it again on the overlay would be redundant.
-          // showWordFlash() is left intact below -- re-enabling this is
-          // a one-line change if that decision ever changes.
+          showWordFlash(ev.word);
         }
-        // 'mode' events are handled via setMode(), not events() -- stage 2f.
       }
     },
 
@@ -296,7 +426,6 @@
     if (!demo || !demo.path || demo.path.length === 0) return;
 
     let idx = 0;
-
     function step() {
       if (idx === 0) {
         window.swipetype.events([{ event: "clear" }]);
@@ -306,28 +435,29 @@
       idx++;
 
       if (idx < demo.path.length) {
-        setTimeout(step, 8); // PRD section 8.8.1: 8ms per point
+        setTimeout(step, 8);
       } else {
         window.swipetype.events([{ event: "commit", word: demo.word }]);
         setTimeout(() => {
           idx = 0;
-          setTimeout(step, 700); // pause so the tail/flash fully finish first
+          setTimeout(step, 700);
         }, 900);
       }
     }
-
     step();
   }
 
   function initDemo() {
-    document.body.classList.add("demo-preview");
     const keys = window.SWIPETYPE_DEMO_KEYS || {};
     const stage = { xmin: -0.75, xmax: 10.0, ymin: -0.75, ymax: 2.75 };
     const params = new URLSearchParams(location.search);
 
     window.swipetype.init({ keys, stage, layout: null, dev: true });
     window.swipetype.setMode(params.get("mode") || "swipe");
-    startDemoPlayback();
+
+    if ((params.get("mode") || "swipe") === "swipe") {
+      startDemoPlayback();
+    }
   }
 
   document.addEventListener("DOMContentLoaded", () => {
