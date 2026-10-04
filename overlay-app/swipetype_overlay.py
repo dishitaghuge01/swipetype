@@ -15,11 +15,21 @@ connecting as a client to daemon.py's OverlayBroadcaster Unix socket
 Path A only: requires a wlr-layer-shell compositor (Sway, Hyprland,
 river, labwc). Will fail to init on GNOME/KDE — see v2 PRD NG1.
 
-STAGE 2e: webview + layer-shell + init() wiring, plus the real-time
-socket -> JS event bridge (section 8.6's _enqueue/_flush batching).
-The IDLE/SWIPE/LAYOUT mode state machine lands in stage 2f; the
-draggable layout mode lands in stage 2g. For now, swipe mode is forced
-on at startup and the input region is always empty, as placeholders.
+STAGE 2f (+ independent visibility toggle): webview + layer-shell +
+init() wiring, the socket -> JS event bridge (section 8.6), and the
+real IDLE/SWIPE mode state machine (opacity + forced-empty-input-
+region, per the spike's fix -- never
+window.set_visible(False)/(True), which breaks the layer-shell role on
+remap). LAYOUT mode lands in stage 2g.
+
+DEVIATION FROM THE PRD, BY REQUEST: what's actually shown on screen is
+no longer driven by swipe mode alone. A second, independent on/off
+preference (self.overlay_visible) is toggled by its own
+GApplication action ("toggle-overlay"), bound to its own compositor
+keybind -- separate from both the main swipe-mode toggle and the
+future "layout" action. Swiping/decoding/injection keep working
+exactly the same regardless of this preference; it only controls
+whether the ghost keyboard is drawn. See _refresh_visual_state().
 
 Fix history, proven in scratch/spike_webkit.py (Stage 2a, not shipped):
   - gtk4-layer-shell must be ctypes-loaded into the process's GLOBAL
@@ -30,12 +40,11 @@ Fix history, proven in scratch/spike_webkit.py (Stage 2a, not shipped):
     renders at its own natural (roughly screen-centered) size instead
     of filling the full-screen anchored layer-shell surface — GTK4
     does not auto-expand children to fill their parent.
-  - "Hiding" the overlay (future IDLE mode, stage 2f) must be done via
-    page opacity + a forced-empty input region, never
-    window.set_visible(False)/(True) — toggling window visibility
-    breaks the layer-shell role on remap (the compositor starts tiling
-    it as an ordinary window instead of keeping it a full-screen
-    overlay).
+  - "Hiding" the overlay must be done via page opacity + a forced-
+    empty input region, never window.set_visible(False)/(True) --
+    toggling window visibility breaks the layer-shell role on remap
+    (the compositor starts tiling it as an ordinary window instead of
+    keeping it a full-screen overlay).
 
 Run manually: python overlay-app/swipetype_overlay.py
 (Packaged as: swipetype-overlay, installed by swipetype-overlay-git)
@@ -79,7 +88,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gtk4LayerShell", "1.0")
 gi.require_version("WebKit", "6.0")
 
-from gi.repository import Gtk, Gdk, GLib, Gtk4LayerShell as LayerShell, WebKit
+from gi.repository import Gtk, Gdk, Gio, GLib, Gtk4LayerShell as LayerShell, WebKit
 import cairo
 
 SOCKET_PATH = f"{os.environ.get('XDG_RUNTIME_DIR', '/tmp')}/swipetype-overlay.sock"
@@ -110,12 +119,24 @@ class OverlayApp(Gtk.Application):
         self.window: Gtk.ApplicationWindow | None = None
         self.webview: WebKit.WebView | None = None
 
-        self.swipe_mode = False
+        # self.mode: the daemon's actual IDLE/SWIPE/LAYOUT state, as
+        # reported by daemon.py's "mode" socket events (PRD section
+        # 8.5 table). LAYOUT isn't reachable yet -- stage 2g.
+        self.mode = "idle"
+
+        # self.overlay_visible: an INDEPENDENT on/off preference for
+        # whether the ghost keyboard is actually drawn, toggled by its
+        # own keybind (the "toggle-overlay" action below) -- separate
+        # from swipe mode on purpose, by request. Swiping/decoding/
+        # injection are unaffected either way; only the visual overlay
+        # is gated by this.
+        self.overlay_visible = True
+
         self._page_ready = False
         self._pending: list[dict] = []     # events queued for the next JS flush
         self._flush_id: int | None = None  # GLib.timeout_add id, or None if no flush is scheduled
 
-        self.cfg = load_config()  # acted on starting stage 2f (lazy creation gating)
+        self.cfg = load_config()
 
     # ---- GTK application lifecycle ----
 
@@ -124,7 +145,13 @@ class OverlayApp(Gtk.Application):
             self.window.present()
             return
         self._build_window()
+        self._register_actions()
         self._start_socket_thread()
+
+    def _register_actions(self) -> None:
+        toggle_action = Gio.SimpleAction.new("toggle-overlay", None)
+        toggle_action.connect("activate", self._on_toggle_overlay_action)
+        self.add_action(toggle_action)
 
     def _build_window(self) -> None:
         self.window = Gtk.ApplicationWindow(application=self)
@@ -163,7 +190,7 @@ class OverlayApp(Gtk.Application):
         )
 
         # UserContentManager + script message handler: not used for
-        # anything yet in stage 2e (layout-mode messages arrive in
+        # anything yet in stage 2f (layout-mode messages arrive in
         # stage 2g), but wired up now since it must exist before the
         # WebView is constructed.
         ucm = WebKit.UserContentManager()
@@ -197,9 +224,6 @@ class OverlayApp(Gtk.Application):
         self.window.set_child(self.webview)
         self.window.connect("map", self._on_map)
 
-        # Stage 2e: force-shown at startup, unconditionally. Lazy
-        # creation based on ghost_overlay.enabled, and the real
-        # IDLE/SWIPE/LAYOUT state machine, land in stage 2f.
         self.window.set_visible(True)
         self.window.present()
 
@@ -207,12 +231,15 @@ class OverlayApp(Gtk.Application):
         self.webview.load_uri(UI_INDEX_URI)
 
     def _on_map(self, _widget) -> None:
+        self._apply_input_region()
+
+    def _apply_input_region(self) -> None:
         surface = self.window.get_surface()
-        if surface is not None:
-            # Stage 2e: always click-through. The real mode-driven
-            # input-region switching (empty in SWIPE, full in LAYOUT)
-            # lands in stage 2f.
-            surface.set_input_region(cairo.Region())
+        if surface is None:
+            return
+        # Both IDLE and SWIPE are fully click-through; LAYOUT (stage
+        # 2g) will be the only mode with a full input region.
+        surface.set_input_region(cairo.Region())
 
     def _on_decide_policy(self, _webview, decision, decision_type) -> bool:
         if decision_type in (
@@ -246,11 +273,10 @@ class OverlayApp(Gtk.Application):
         )
         webview.evaluate_javascript(init_js, -1, None, None, None, None)
 
-        # Stage 2d/2e step: force swipe mode on at startup so this
-        # stage's checks can be verified without a full mode state
-        # machine. The real state machine replaces this in stage 2f.
-        self.swipe_mode = True
-        webview.evaluate_javascript('window.swipetype.setMode("swipe");', -1, None, None, None, None)
+        # Starts IDLE/hidden either way, exactly like it will when
+        # daemon.py isn't running yet or swipe mode hasn't been
+        # toggled on.
+        self._refresh_visual_state()
 
         # Drain anything that arrived over the socket before the page
         # finished loading (unlikely in practice, since daemon.py
@@ -259,7 +285,7 @@ class OverlayApp(Gtk.Application):
         GLib.idle_add(self._flush)
 
         if DEV_MODE:
-            print("[swipetype-overlay] page load FINISHED; init() + setMode('swipe') sent.")
+            print("[swipetype-overlay] page load FINISHED; init() sent.")
 
     def _on_js_message(self, _ucm, value) -> None:
         # Not used until stage 2g (layout-mode messages). Logged in
@@ -270,6 +296,58 @@ class OverlayApp(Gtk.Application):
                 print(f"[swipetype-overlay] JS message: {json.loads(value.to_json(0))}")
             except Exception as e:
                 print(f"[swipetype-overlay] JS message (unparseable): {e}")
+
+    # ---- Mode state machine (PRD section 8.5 table) ----
+
+    def _apply_mode(self, mode: str) -> None:
+        if mode == "layout":
+            # Not reachable yet -- stage 2g wires up the "layout"
+            # GApplication action that triggers this transition.
+            return
+        self.mode = mode
+        if DEV_MODE:
+            print(f"[swipetype-overlay] daemon mode -> {mode}")
+        self._refresh_visual_state()
+
+    def _on_toggle_overlay_action(self, _action, _param) -> None:
+        self.overlay_visible = not self.overlay_visible
+        if DEV_MODE:
+            print(f"[swipetype-overlay] overlay_visible preference -> {self.overlay_visible}")
+        self._refresh_visual_state()
+
+    def _refresh_visual_state(self) -> None:
+        # What's actually SHOWN depends on three independent things:
+        #   1. self.mode            -- is the daemon actually in swipe mode right now?
+        #   2. self.overlay_visible -- the user's own on/off preference, toggled
+        #                              by its own keybind, independent of swipe mode.
+        #   3. ghost_overlay.enabled in config.yaml -- re-read on every check, so
+        #      toggling it never requires restarting anything.
+        # Swiping/decoding/injection in daemon.py are completely unaffected by
+        # any of this -- it only controls whether the ghost keyboard is drawn.
+        visible = False
+        if self.mode == "swipe" and self.overlay_visible:
+            self.cfg = load_config()
+            enabled = self.cfg.get("ghost_overlay", {}).get("enabled", True)
+            visible = enabled
+
+        visual_mode = "swipe" if visible else "idle"
+        opacity = "1" if visible else "0"
+
+        if self._page_ready:
+            js = (f"document.body.style.transition = 'opacity 150ms'; "
+                  f"document.body.style.opacity = '{opacity}';")
+            self.webview.evaluate_javascript(js, -1, None, None, None, None)
+            self.webview.evaluate_javascript(f'window.swipetype.setMode("{visual_mode}");', -1, None, None, None, None)
+
+        self._apply_input_region()
+
+        if not visible:
+            # Clear any in-progress comet trail so a stale trace isn't
+            # sitting there the next time it becomes visible again.
+            if self._page_ready:
+                self.webview.evaluate_javascript(
+                    'window.swipetype.events([{"event": "clear"}]);', -1, None, None, None, None)
+            self._pending = []
 
     # ---- Socket client (background thread) ----
 
@@ -322,6 +400,14 @@ class OverlayApp(Gtk.Application):
     # ---- Event bridge: socket -> JS, batched (PRD section 8.6) ----
 
     def _handle_event(self, event: dict) -> bool:
+        etype = event.get("event")
+        if etype == "mode":
+            # "mode" is a Python-side state transition (IDLE<->SWIPE),
+            # not something forwarded into events() -- overlay.js's
+            # events() dispatch intentionally ignores 'mode' (PRD
+            # section 8.6: "mode is handled via setMode(), not events()").
+            self._apply_mode("swipe" if event.get("swipe_mode") else "idle")
+            return False
         self._enqueue(event)
         return False  # GLib.idle_add: don't repeat this call
 
