@@ -2,26 +2,59 @@
 """
 overlay-app/swipetype_overlay.py
 
-The SwipeType ghost overlay (PRD v2 section 8.5). A separate,
-optional GTK4 process — never imported by or embedded in daemon.py
-(see section 8.1 for why: GTK needs its own GLib main loop, and this
-keeps the core daemon package free of a GTK dependency).
+The SwipeType ghost overlay (PRD v2 rev2 section 8.5). A separate,
+optional process — never imported by or embedded in daemon.py (section
+8.1: GTK needs its own GLib main loop, and this keeps the core daemon
+package free of a GTK/WebKit dependency).
 
-Shows a translucent, click-through, always-on-top QWERTY layout
-(matching decoder/geometry.KEY_CENTERS exactly) plus a live trace of
-the in-progress swipe, by connecting as a client to daemon.py's
-OverlayBroadcaster Unix socket (overlay/broadcaster.py) and rendering
-newline-delimited JSON events with Cairo.
+Shows the HTML/CSS/JS ghost keyboard (overlay-app/ui/) in a
+transparent, click-through, always-on-top WebKitGTK view, by
+connecting as a client to daemon.py's OverlayBroadcaster Unix socket
+(overlay/broadcaster.py).
 
 Path A only: requires a wlr-layer-shell compositor (Sway, Hyprland,
 river, labwc). Will fail to init on GNOME/KDE — see v2 PRD NG1.
+
+STAGE 2d: webview + layer-shell + init() wiring only. The real-time
+socket -> JS event bridge (section 8.6's batching) lands in stage 2e;
+the IDLE/SWIPE/LAYOUT mode state machine lands in stage 2f; the
+draggable layout mode lands in stage 2g. For now, swipe mode is forced
+on at startup so this stage's own check (full-screen, transparent,
+click-through, real KEY_CENTERS) can be verified on its own.
+
+Fix history, proven in scratch/spike_webkit.py (Stage 2a, not shipped):
+  - gtk4-layer-shell must be ctypes-loaded into the process's GLOBAL
+    symbol table *before* `import gi` — LD_PRELOAD does not reliably
+    apply to PyGObject processes on this system. No LD_PRELOAD env var
+    is needed anywhere in the packaged launcher as a result.
+  - The webview widget needs hexpand/vexpand explicitly set, or it
+    renders at its own natural (roughly screen-centered) size instead
+    of filling the full-screen anchored layer-shell surface — GTK4
+    does not auto-expand children to fill their parent.
+  - "Hiding" the overlay (future IDLE mode, stage 2f) must be done via
+    page opacity + a forced-empty input region, never
+    window.set_visible(False)/(True) — toggling window visibility
+    breaks the layer-shell role on remap (the compositor starts tiling
+    it as an ordinary window instead of keeping it a full-screen
+    overlay).
 
 Run manually: python overlay-app/swipetype_overlay.py
 (Packaged as: swipetype-overlay, installed by swipetype-overlay-git)
 """
 
+# MUST be the very first thing that touches GTK/Wayland -- before
+# `import gi` and before any gi.require_version() call. See fix
+# history above.
+import ctypes
+try:
+    ctypes.CDLL("/usr/lib/libgtk4-layer-shell.so", mode=ctypes.RTLD_GLOBAL)
+except OSError as e:
+    print(f"[swipetype-overlay] WARNING: failed to ctypes-load "
+          f"libgtk4-layer-shell.so ({e}). The overlay will likely "
+          f"render as an ordinary tiled window instead of a full-screen "
+          f"layer-shell surface.", file=__import__("sys").stderr)
+
 import json
-import math
 import os
 import socket
 import sys
@@ -31,8 +64,8 @@ import time
 # Importable both from a dev checkout (this file lives in
 # <repo>/overlay-app/, sibling to <repo>/decoder/ and <repo>/config.py)
 # and from the installed package layout (PKGBUILD installs this file
-# standalone to /usr/bin/swipetype-overlay, with the rest of the
-# source tree under /usr/share/swipetype/).
+# standalone to /usr/share/swipetype-overlay/, with the daemon's source
+# tree under /usr/share/swipetype/).
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 for _candidate in ("/usr/share/swipetype", os.path.dirname(_THIS_DIR)):
     if _candidate not in sys.path:
@@ -45,36 +78,38 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gtk4LayerShell", "1.0")
+gi.require_version("WebKit", "6.0")
 
-from gi.repository import Gtk, Gdk, GLib, Gtk4LayerShell as LayerShell
+from gi.repository import Gtk, Gdk, GLib, Gtk4LayerShell as LayerShell, WebKit
 import cairo
 
 SOCKET_PATH = f"{os.environ.get('XDG_RUNTIME_DIR', '/tmp')}/swipetype-overlay.sock"
 RECONNECT_INTERVAL_S = 2.0
-FLASH_DURATION_MS = 800
 
-# Key-space bounds for laying KEY_CENTERS out on the drawing area,
-# with a little padding beyond the actual key extremes (x: Q=0 .. P=9,
-# y: top row=0 .. bottom row=2 — see decoder/geometry.py).
-KEY_SPACE_X_MIN, KEY_SPACE_X_MAX = -0.75, 9.75
-KEY_SPACE_Y_MIN, KEY_SPACE_Y_MAX = -0.6, 2.6
+UI_DIR = os.path.join(_THIS_DIR, "ui")
+UI_INDEX_URI = "file://" + os.path.join(UI_DIR, "index.html")
 
-OVERLAY_WIDTH = 780
-OVERLAY_HEIGHT = 220
+# Stage bounds injected into window.swipetype.init() (PRD section 8.6).
+# Key rects span x∈[-0.5,9.5], y∈[-0.5,2.5] (KEY_CENTERS ± 0.5);
+# decoder.geometry.to_key_space() can reach x=9.75; +0.25 padding on
+# all sides. Must match overlay-app/ui/overlay.js's own demo-mode
+# constants exactly (scratch/check_ui_keys.py does not check this --
+# worth eyeballing if the two ever need to change).
+STAGE_BOUNDS = {"xmin": -0.75, "xmax": 10.0, "ymin": -0.75, "ymax": 2.75}
+
+DEV_MODE = bool(os.environ.get("SWIPETYPE_OVERLAY_DEV"))
 
 
 class OverlayApp(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="dev.dishitaghuge.swipetype.overlay")
         self.window: Gtk.ApplicationWindow | None = None
-        self.drawing_area: Gtk.DrawingArea | None = None
+        self.webview: WebKit.WebView | None = None
 
         self.swipe_mode = False
-        self.trace_points: list[tuple[float, float]] = []
-        self.flash_word: str | None = None
-        self._flash_timeout_id: int | None = None
+        self._page_ready = False
 
-        self.cfg = load_config()
+        self.cfg = load_config()  # acted on starting stage 2f (lazy creation gating)
 
     # ---- GTK application lifecycle ----
 
@@ -88,26 +123,30 @@ class OverlayApp(Gtk.Application):
     def _build_window(self) -> None:
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_decorated(False)
-        self.window.set_resizable(False)
 
-        # Stage (a): layer-shell setup. Must happen before the window
-        # is realized/shown.
+        # --- Layer shell: full output, all four edges anchored (PRD
+        # section 8.5). All keyboard placement/resizing happens INSIDE
+        # the page via CSS/JS (overlay.js's coordinate mapping); the
+        # layer surface itself never resizes.
         LayerShell.init_for_window(self.window)
         LayerShell.set_layer(self.window, LayerShell.Layer.OVERLAY)
         LayerShell.set_namespace(self.window, "swipetype-overlay")
-
-        # Anchored to the bottom edge only; the compositor centers it
-        # horizontally since neither LEFT nor RIGHT is anchored. This
-        # is a floating ghost-keyboard panel, not a full-width bar, so
-        # we deliberately do NOT reserve screen space for it.
-        LayerShell.set_anchor(self.window, LayerShell.Edge.BOTTOM, True)
-        LayerShell.set_margin(self.window, LayerShell.Edge.BOTTOM, 36)
-        LayerShell.set_exclusive_zone(self.window, 0)
-
-        # Never take keyboard focus — this is a purely visual overlay.
+        for edge in (LayerShell.Edge.TOP, LayerShell.Edge.BOTTOM,
+                     LayerShell.Edge.LEFT, LayerShell.Edge.RIGHT):
+            LayerShell.set_anchor(self.window, edge, True)
+        # -1 = "don't be shifted by other layers' reserved zones" (NOT
+        # "reserve space" -- rev1 had this backwards, corrected in the
+        # rev2 PRD section 8.5).
+        LayerShell.set_exclusive_zone(self.window, -1)
         LayerShell.set_keyboard_mode(self.window, LayerShell.KeyboardMode.NONE)
 
-        # Transparent background so only the drawn content shows.
+        if DEV_MODE:
+            print(f"[swipetype-overlay] LayerShell.is_layer_window() -> "
+                  f"{LayerShell.is_layer_window(self.window)}")
+
+        # Transparent background, place 1 of 3 (GTK CSS). Places 2 and
+        # 3 are the webview's own background color and the page's own
+        # CSS, both set below / in overlay-app/ui/style.css.
         css = b"window { background-color: transparent; }"
         provider = Gtk.CssProvider()
         provider.load_from_data(css)
@@ -117,29 +156,109 @@ class OverlayApp(Gtk.Application):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
 
-        self.drawing_area = Gtk.DrawingArea()
-        self.drawing_area.set_content_width(OVERLAY_WIDTH)
-        self.drawing_area.set_content_height(OVERLAY_HEIGHT)
-        self.drawing_area.set_draw_func(self._on_draw, None)
-        self.window.set_child(self.drawing_area)
+        # UserContentManager + script message handler: not used for
+        # anything yet in stage 2d (layout-mode messages arrive in
+        # stage 2g), but wired up now since it must exist before the
+        # WebView is constructed.
+        ucm = WebKit.UserContentManager()
+        ucm.register_script_message_handler("swipetype", None)
+        ucm.connect("script-message-received::swipetype", self._on_js_message)
 
-        # Click-through: set once the window is actually mapped, since
-        # the Gdk.Surface doesn't exist until then.
+        session = WebKit.NetworkSession.new_ephemeral()
+        self.webview = WebKit.WebView(network_session=session, user_content_manager=ucm)
+
+        # Without this, GTK4 renders the webview at its own natural
+        # (roughly screen-centered) size instead of filling the
+        # full-screen anchored window. See fix history at the top of
+        # this file.
+        self.webview.set_hexpand(True)
+        self.webview.set_vexpand(True)
+
+        # Transparent background, place 2 of 3 (webview).
+        rgba = Gdk.RGBA()
+        rgba.parse("rgba(0,0,0,0)")
+        self.webview.set_background_color(rgba)
+
+        settings = self.webview.get_settings()
+        settings.set_enable_developer_extras(DEV_MODE)
+
+        # Navigation lock (PRD section 8.5, G8 offline enforcement):
+        # the page has no reason to ever navigate away from its own
+        # file:// UI. Blocking this keeps "fully offline" an enforced
+        # property, not just an intended one.
+        self.webview.connect("decide-policy", self._on_decide_policy)
+
+        self.window.set_child(self.webview)
         self.window.connect("map", self._on_map)
 
-        # Start hidden — only shown while swipe mode is on AND
-        # ghost_overlay.enabled is true (re-checked on each mode
-        # event, see _on_mode_event).
-        self.window.set_visible(False)
+        # Stage 2d: force-shown at startup, unconditionally. Lazy
+        # creation based on ghost_overlay.enabled, and the real
+        # IDLE/SWIPE/LAYOUT state machine, land in stage 2f.
+        self.window.set_visible(True)
         self.window.present()
+
+        self.webview.connect("load-changed", self._on_load_changed)
+        self.webview.load_uri(UI_INDEX_URI)
 
     def _on_map(self, _widget) -> None:
         surface = self.window.get_surface()
         if surface is not None:
-            # Empty region == nothing captures pointer input == fully
-            # click-through. gtk4-layer-shell has no direct API for
-            # this, so it's done via the underlying Gdk.Surface.
+            # Stage 2d: always click-through. The real mode-driven
+            # input-region switching (empty in SWIPE, full in LAYOUT)
+            # lands in stage 2f.
             surface.set_input_region(cairo.Region())
+
+    def _on_decide_policy(self, _webview, decision, decision_type) -> bool:
+        if decision_type in (
+            WebKit.PolicyDecisionType.NAVIGATION_ACTION,
+            WebKit.PolicyDecisionType.NEW_WINDOW_ACTION,
+        ):
+            uri = decision.get_navigation_action().get_request().get_uri()
+            if uri != UI_INDEX_URI:
+                decision.ignore()
+                return True
+        return False
+
+    # ---- Page load -> window.swipetype.init() (PRD section 8.6) ----
+
+    def _on_load_changed(self, webview, event) -> None:
+        if event != WebKit.LoadEvent.FINISHED:
+            return
+        self._page_ready = True
+
+        keys_json = json.dumps({letter: list(xy) for letter, xy in KEY_CENTERS.items()})
+        stage_json = json.dumps(STAGE_BOUNDS)
+        dev_json = "true" if DEV_MODE else "false"
+
+        init_js = (
+            f"window.swipetype.init({{"
+            f"keys: {keys_json}, "
+            f"stage: {stage_json}, "
+            f"layout: null, "
+            f"dev: {dev_json}"
+            f"}});"
+        )
+        webview.evaluate_javascript(init_js, -1, None, None, None, None)
+
+        # Stage 2d step 3: force swipe mode on at startup so this
+        # stage's check (keys visible, positioned, click-through) can
+        # be verified without the daemon or the socket bridge running.
+        # The real mode state machine replaces this in stage 2f.
+        self.swipe_mode = True
+        webview.evaluate_javascript('window.swipetype.setMode("swipe");', -1, None, None, None, None)
+
+        if DEV_MODE:
+            print("[swipetype-overlay] page load FINISHED; init() + setMode('swipe') sent.")
+
+    def _on_js_message(self, _ucm, value) -> None:
+        # Not used until stage 2g (layout-mode messages). Logged in
+        # dev mode so unexpected messages aren't silently dropped
+        # during development.
+        if DEV_MODE:
+            try:
+                print(f"[swipetype-overlay] JS message: {json.loads(value.to_json(0))}")
+            except Exception as e:
+                print(f"[swipetype-overlay] JS message (unparseable): {e}")
 
     # ---- Socket client (background thread) ----
 
@@ -154,7 +273,7 @@ class OverlayApp(Gtk.Application):
                 sock.connect(SOCKET_PATH)
             except OSError:
                 # Daemon not running, or hasn't started its overlay
-                # socket yet. Retry rather than crash — the overlay
+                # socket yet. Retry rather than crash -- the overlay
                 # should never be a reason the whole system needs
                 # restarting.
                 time.sleep(RECONNECT_INTERVAL_S)
@@ -175,10 +294,9 @@ class OverlayApp(Gtk.Application):
                             event = json.loads(line.decode("utf-8"))
                         except json.JSONDecodeError:
                             continue
-                        # GTK widgets must only be touched from the
-                        # GTK main thread; idle_add is the standard
-                        # way to hand data across from this worker
-                        # thread.
+                        # GTK/WebKit must only be touched from the main
+                        # thread; idle_add hands data across from this
+                        # worker thread.
                         GLib.idle_add(self._handle_event, event)
             except OSError:
                 pass
@@ -190,116 +308,13 @@ class OverlayApp(Gtk.Application):
 
             time.sleep(RECONNECT_INTERVAL_S)
 
-    # ---- Event handling (runs on GTK main thread via idle_add) ----
-
     def _handle_event(self, event: dict) -> bool:
-        etype = event.get("event")
-
-        if etype == "mode":
-            self._on_mode_event(bool(event.get("swipe_mode")))
-        elif etype == "clear":
-            self.trace_points = []
-            self.flash_word = None
-            self._queue_redraw()
-        elif etype == "point":
-            x, y = event.get("x"), event.get("y")
-            if x is not None and y is not None:
-                self.trace_points.append((float(x), float(y)))
-                self._queue_redraw()
-        elif etype == "commit":
-            word = event.get("word")
-            if word:
-                self._show_flash(word)
-
+        # Stage 2d: received and logged only. The real batched
+        # dispatch into window.swipetype.events([...]) -- per PRD
+        # section 8.6's _enqueue/_flush -- is built in stage 2e.
+        if DEV_MODE:
+            print(f"[swipetype-overlay] socket event (not yet dispatched to JS): {event}")
         return False  # GLib.idle_add: don't repeat this call
-
-    def _on_mode_event(self, swipe_mode: bool) -> None:
-        self.swipe_mode = swipe_mode
-        if swipe_mode:
-            # Cheap, tiny file — re-check on every mode-on so toggling
-            # ghost_overlay.enabled never requires restarting anything.
-            self.cfg = load_config()
-            enabled = self.cfg.get("ghost_overlay", {}).get("enabled", True)
-            self.window.set_visible(enabled)
-        else:
-            self.window.set_visible(False)
-            self.trace_points = []
-            self.flash_word = None
-
-    def _show_flash(self, word: str) -> None:
-        self.flash_word = word
-        # Reset the trace now — ready for the next gesture's "clear"
-        # event, which will also arrive shortly, harmlessly.
-        self.trace_points = []
-        if self._flash_timeout_id is not None:
-            GLib.source_remove(self._flash_timeout_id)
-        self._flash_timeout_id = GLib.timeout_add(FLASH_DURATION_MS, self._clear_flash)
-        self._queue_redraw()
-
-    def _clear_flash(self) -> bool:
-        self.flash_word = None
-        self._flash_timeout_id = None
-        self._queue_redraw()
-        return False  # don't repeat
-
-    def _queue_redraw(self) -> None:
-        if self.drawing_area is not None:
-            self.drawing_area.queue_draw()
-
-    # ---- Rendering ----
-
-    def _key_to_pixel(self, kx: float, ky: float, width: int, height: int) -> tuple[float, float]:
-        px = (kx - KEY_SPACE_X_MIN) / (KEY_SPACE_X_MAX - KEY_SPACE_X_MIN) * width
-        py = (ky - KEY_SPACE_Y_MIN) / (KEY_SPACE_Y_MAX - KEY_SPACE_Y_MIN) * height
-        return px, py
-
-    def _on_draw(self, _area, cr: cairo.Context, width: int, height: int, _data) -> None:
-        # Fully transparent clear first (window CSS is already
-        # transparent, but the drawing area's own surface needs this
-        # too or it can paint an opaque background).
-        cr.save()
-        cr.set_operator(cairo.OPERATOR_SOURCE)
-        cr.set_source_rgba(0, 0, 0, 0)
-        cr.paint()
-        cr.restore()
-        cr.set_operator(cairo.OPERATOR_OVER)
-
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-
-        # Faint QWERTY layout, straight from decoder/geometry.KEY_CENTERS.
-        cr.set_font_size(13)
-        for letter, (kx, ky) in KEY_CENTERS.items():
-            px, py = self._key_to_pixel(kx, ky, width, height)
-
-            cr.set_source_rgba(1, 1, 1, 0.14)
-            cr.arc(px, py, 15, 0, 2 * math.pi)
-            cr.fill()
-
-            cr.set_source_rgba(1, 1, 1, 0.5)
-            extents = cr.text_extents(letter.upper())
-            cr.move_to(px - extents.width / 2 - extents.x_bearing, py + extents.height / 2)
-            cr.show_text(letter.upper())
-
-        # Live trace of the in-progress gesture.
-        if len(self.trace_points) >= 2:
-            cr.set_source_rgba(0.35, 0.8, 1.0, 0.85)
-            cr.set_line_width(3)
-            cr.set_line_cap(cairo.LINE_CAP_ROUND)
-            cr.set_line_join(cairo.LINE_JOIN_ROUND)
-            first_px, first_py = self._key_to_pixel(*self.trace_points[0], width, height)
-            cr.move_to(first_px, first_py)
-            for kx, ky in self.trace_points[1:]:
-                px, py = self._key_to_pixel(kx, ky, width, height)
-                cr.line_to(px, py)
-            cr.stroke()
-
-        # Flash the just-committed word briefly.
-        if self.flash_word:
-            cr.set_source_rgba(1, 1, 1, 0.95)
-            cr.set_font_size(26)
-            extents = cr.text_extents(self.flash_word)
-            cr.move_to(width / 2 - extents.width / 2 - extents.x_bearing, height / 2 + extents.height / 2)
-            cr.show_text(self.flash_word)
 
 
 def main() -> None:
