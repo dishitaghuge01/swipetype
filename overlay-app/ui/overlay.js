@@ -6,24 +6,36 @@
  * standalone in a plain browser for design iteration, via
  * index.html?demo (section 8.8) using demo/keys.js + demo/demo-path.js.
  *
- * STAGE 2b: key generation + coordinate mapping + demo bootstrap.
- * STAGE 2c: comet renderer + demo playback loop.
- * STAGE 2g (this version): layout mode -- drag to move, aspect-locked
- * corner-handle resize, Fit screen / Reset / Done toolbar, persisted
- * via postMessage to the Python host (section 8.7.6).
+ * Key generation + coordinate mapping, comet renderer, layout mode
+ * (drag / aspect-locked corner resize / Fit screen / Reset / Done),
+ * and a nearest-key ".active" glow under the comet head.
+ *
+ * Perf note: the comet is drawn with layered translucent strokes, NOT
+ * canvas shadowBlur. shadowBlur on ~40 segments per frame measured at
+ * ~25% CPU in the web process; layered strokes look near-identical at
+ * a fraction of the cost (PRD risk S5).
  */
 
 (function () {
   "use strict";
 
   // ---- comet tunables (PRD section 8.7.4) -- all in one place ----
-  const TRAIL_MS = 420;
-  const HEAD_WIDTH_U = 0.13;
-  const TAIL_WIDTH_U = 0.02;
-  const SMOOTHING = 0.55;
-  const GLOW_COLOR = "rgba(140, 190, 255, 0.85)";
-  const GLOW_BLUR_U = 0.10;
-  const HEAD_DISC_FRESH_MS = 80;
+  const TRAIL_MS = 420;          // how long a point stays in the tail
+  const HEAD_WIDTH_U = 0.13;     // stroke width at the head, in key-units
+  const TAIL_WIDTH_U = 0.02;     // stroke width at the tail, in key-units
+  const SMOOTHING = 0.55;        // head lerp factor, removes touchpad jitter
+  const HEAD_DISC_FRESH_MS = 80; // head glow disc shows while last point < this old
+  const ACTIVE_KEY_FRESH_MS = 150; // nearest-key glow shows while last point < this old
+
+  // Stroke passes, drawn back to front for every segment. "width" is a
+  // multiplier on the segment's tapered base width; "alpha" is the max
+  // opacity (further scaled by the segment's age fade). Edit these to
+  // restyle the glow -- no blur involved, so it stays cheap.
+  const COMET_PASSES = [
+    { width: 3.4, alpha: 0.10, rgb: "140, 190, 255" }, // wide, faint blue halo
+    { width: 2.0, alpha: 0.22, rgb: "170, 205, 255" }, // medium glow
+    { width: 1.0, alpha: 0.95, rgb: "255, 255, 255" }, // bright white core
+  ];
 
   // ---- module state ----
   let KEYS = {};       // letter -> [kx, ky]
@@ -31,19 +43,20 @@
   let LAYOUT = null;   // {cx, cy, w} or null = fit-to-screen ("contain")
   let lastRect = null; // most recent computeLayoutRect() result
 
-  let cometPoints = [];
-  let cometHeadKx = null;
+  let keyEls = {};         // letter -> DOM element (rebuilt by renderKeys)
+  let activeLetter = null; // key currently carrying the .active class
+
+  let cometPoints = [];        // [{kx, ky, t}], t = performance.now()
+  let cometHeadKx = null;      // smoothed head, in key-space
   let cometHeadKy = null;
   let cometRafId = null;
 
-  let dragState = null; // {type:'move'|'resize', handle, pointerId, ...}
+  let dragState = null; // {type:'move'|'resize', ...}
 
   const stageEl = document.getElementById("stage");
   const keysEl = document.getElementById("keys");
   const cometCanvas = document.getElementById("comet");
   const cometCtx = cometCanvas.getContext("2d");
-  const flashEl = document.getElementById("flash");
-  const outlineEl = document.getElementById("outline");
   const toolbarEl = document.getElementById("toolbar");
 
   // ---- coordinate mapping (PRD section 8.7.2 -- single source of truth) ----
@@ -105,6 +118,8 @@
 
   function renderKeys(rect) {
     keysEl.innerHTML = "";
+    keyEls = {};
+    activeLetter = null;
     for (const letter of Object.keys(KEYS)) {
       const [kx, ky] = KEYS[letter];
       const [px, py] = keyToStagePx(kx, ky, rect);
@@ -115,7 +130,32 @@
       div.style.top = py + "px";
       div.textContent = letter;
       keysEl.appendChild(div);
+      keyEls[letter] = div;
     }
+  }
+
+  // ---- nearest-key glow ----
+
+  function setActiveKey(letter) {
+    if (letter === activeLetter) return;
+    if (activeLetter && keyEls[activeLetter]) keyEls[activeLetter].classList.remove("active");
+    if (letter && keyEls[letter]) keyEls[letter].classList.add("active");
+    activeLetter = letter;
+  }
+
+  function nearestKey(kx, ky) {
+    let best = null;
+    let bestD = Infinity;
+    for (const letter of Object.keys(KEYS)) {
+      const dx = KEYS[letter][0] - kx;
+      const dy = KEYS[letter][1] - ky;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = letter;
+      }
+    }
+    return best;
   }
 
   // ---- comet canvas sizing ----
@@ -158,6 +198,7 @@
     cometHeadKx = null;
     cometHeadKy = null;
     cometCtx.clearRect(0, 0, cometCanvas.width, cometCanvas.height);
+    setActiveKey(null);
   }
 
   function ensureCometLoop() {
@@ -170,42 +211,37 @@
     return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   }
 
-  function strokeQuad(from, ctrl, to, pointT, now, u, isGlow) {
+  function strokeQuad(from, ctrl, to, pointT, now, u, pass) {
     const age = Math.min(1, (now - pointT) / TRAIL_MS);
-    const alpha = Math.pow(1 - age, 1.5);
+    const fade = Math.pow(1 - age, 1.5);
+    const alpha = pass.alpha * fade;
     if (alpha <= 0.01) return;
 
-    const widthFrac = 1 - age;
+    const widthFrac = 1 - age; // 1 at head, 0 at tail
     const baseWidth = (TAIL_WIDTH_U + (HEAD_WIDTH_U - TAIL_WIDTH_U) * widthFrac) * u;
 
     cometCtx.beginPath();
     cometCtx.moveTo(from.x, from.y);
     cometCtx.quadraticCurveTo(ctrl.x, ctrl.y, to.x, to.y);
     cometCtx.lineCap = "round";
-
-    if (isGlow) {
-      cometCtx.strokeStyle = `rgba(140, 190, 255, ${0.35 * alpha})`;
-      cometCtx.lineWidth = baseWidth * 3.2;
-      cometCtx.shadowColor = GLOW_COLOR;
-      cometCtx.shadowBlur = GLOW_BLUR_U * u;
-    } else {
-      cometCtx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
-      cometCtx.lineWidth = baseWidth;
-      cometCtx.shadowBlur = 0;
-    }
+    cometCtx.strokeStyle = `rgba(${pass.rgb}, ${alpha})`;
+    cometCtx.lineWidth = baseWidth * pass.width;
     cometCtx.stroke();
   }
 
-  function drawCometPass(pxPoints, now, u, isGlow) {
+  function drawCometPass(pxPoints, now, u, pass) {
     const n = pxPoints.length;
     if (n === 2) {
-      strokeQuad(pxPoints[0], pxPoints[0], pxPoints[1], pxPoints[1].t, now, u, isGlow);
+      strokeQuad(pxPoints[0], pxPoints[0], pxPoints[1], pxPoints[1].t, now, u, pass);
       return;
     }
+    // Smooth-polyline technique: each interior point is a Bezier
+    // control point between the midpoints of its neighboring
+    // segments -- no visible corners.
     for (let i = 1; i < n - 1; i++) {
       const prevMid = midpoint(pxPoints[i - 1], pxPoints[i]);
       const nextMid = midpoint(pxPoints[i], pxPoints[i + 1]);
-      strokeQuad(prevMid, pxPoints[i], nextMid, pxPoints[i].t, now, u, isGlow);
+      strokeQuad(prevMid, pxPoints[i], nextMid, pxPoints[i].t, now, u, pass);
     }
   }
 
@@ -213,6 +249,19 @@
     cometRafId = null;
     const now = performance.now();
     cometPoints = cometPoints.filter((p) => now - p.t <= TRAIL_MS);
+
+    // Nearest-key glow follows the head while the head is fresh, and
+    // switches off as soon as the finger stops / lifts.
+    if (cometPoints.length === 0) {
+      setActiveKey(null);
+    } else {
+      const lastPt = cometPoints[cometPoints.length - 1];
+      if (now - lastPt.t < ACTIVE_KEY_FRESH_MS) {
+        setActiveKey(nearestKey(cometHeadKx, cometHeadKy));
+      } else {
+        setActiveKey(null);
+      }
+    }
 
     cometCtx.clearRect(0, 0, cometCanvas.width, cometCanvas.height);
 
@@ -224,8 +273,9 @@
         t: p.t,
       }));
 
-      drawCometPass(pxPoints, now, u, true);
-      drawCometPass(pxPoints, now, u, false);
+      for (const pass of COMET_PASSES) {
+        drawCometPass(pxPoints, now, u, pass);
+      }
 
       const last = pxPoints[pxPoints.length - 1];
       if (now - last.t < HEAD_DISC_FRESH_MS) {
@@ -240,17 +290,10 @@
       }
     }
 
+    // rAF runs ONLY while the buffer is non-empty (idle cost ~ zero).
     if (cometPoints.length > 0) {
       cometRafId = requestAnimationFrame(drawCometFrame);
     }
-  }
-
-  // ---- word flash (disabled by design -- see stage 2c follow-up) ----
-
-  function showWordFlash(_word) {
-    // Intentionally a no-op: the committed word already appears in
-    // the real focused text field, so flashing it again here would be
-    // redundant. Left in place (unused) in case this is revisited.
   }
 
   // ---- host bridge (outbound) ----
@@ -291,8 +334,8 @@
     const handle = e.currentTarget.dataset.handle;
     const rect = computeLayoutRect();
 
-    // The anchor is the OPPOSITE corner, in viewport px -- it must
-    // stay fixed while the dragged corner follows the pointer.
+    // The anchor is the OPPOSITE corner, in viewport px -- it stays
+    // fixed while the dragged corner follows the pointer.
     const anchors = {
       tl: { x: rect.left + rect.width, y: rect.top + rect.height },
       tr: { x: rect.left, y: rect.top + rect.height },
@@ -317,10 +360,8 @@
     if (dragState.type === "move") {
       const dx = e.clientX - dragState.startClientX;
       const dy = e.clientY - dragState.startClientY;
-      // Clamping cx/cy (the stage CENTER, as a fraction of the
-      // viewport) to [0, 1] guarantees at least half the stage stays
-      // on screen on every edge, regardless of its width -- PRD
-      // 8.7.6's "at least 50% of the stage must stay on screen".
+      // Clamping the stage CENTER to [0,1] of the viewport keeps at
+      // least half the stage on screen on every edge.
       const newCx = clamp(dragState.startLayout.cx + dx / vw, 0, 1);
       const newCy = clamp(dragState.startLayout.cy + dy / vh, 0, 1);
       LAYOUT = { cx: newCx, cy: newCy, w: dragState.startLayout.w };
@@ -400,9 +441,10 @@
           pushCometPoint(ev.x, ev.y);
         } else if (ev.event === "clear") {
           clearComet();
-        } else if (ev.event === "commit") {
-          showWordFlash(ev.word);
         }
+        // "commit": the word flash is intentionally disabled -- the
+        // committed word already appears in the real focused text
+        // field. "mode" is handled via setMode(), not events().
       }
     },
 
@@ -435,12 +477,11 @@
       idx++;
 
       if (idx < demo.path.length) {
-        setTimeout(step, 8);
+        setTimeout(step, 8); // PRD section 8.8.1: 8ms per point
       } else {
-        window.swipetype.events([{ event: "commit", word: demo.word }]);
         setTimeout(() => {
           idx = 0;
-          setTimeout(step, 700);
+          setTimeout(step, 700); // pause so the tail fully finishes first
         }, 900);
       }
     }
@@ -464,5 +505,7 @@
     if (isDemo() || !hasRealBridge()) {
       initDemo();
     }
+    // else: the real overlay host calls window.swipetype.init() itself
+    // once its WebKit load-changed FINISHED handler fires.
   });
 })();
