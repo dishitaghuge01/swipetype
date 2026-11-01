@@ -110,33 +110,36 @@ html, body {
 #scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.45);
   pointer-events: none; /* dragging happens on #stage / handles, not the scrim itself */
 }
 
+/* The outline and handles are drawn INSIDE the stage box (over its
+   empty padding around the keys), not outside it -- so they stay fully
+   on screen even when the stage is as wide as the screen itself
+   (w = 1.0), where outside-the-box handles would be clipped off-screen. */
 #outline {
   position: absolute;
-  inset: -18px; /* extends slightly beyond #stage's own box -- tracks it automatically */
-  border: 1px dashed rgba(255, 255, 255, 0.75);
+  inset: 3px;
+  border: 2px dashed rgba(255, 255, 255, 0.85);
   border-radius: 14px;
   pointer-events: none; /* only the handles themselves are draggable */
 }
 
 .handle {
   position: absolute;
-  width: 14px; height: 14px;
+  width: 20px; height: 20px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.45), 0 1px 4px rgba(0, 0, 0, 0.5);
+  background: #ffffff;
+  border: 2px solid rgba(90, 150, 255, 0.95);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.7), 0 1px 5px rgba(0, 0, 0, 0.6);
   pointer-events: auto;
   touch-action: none; /* required for reliable Pointer Events dragging */
-  cursor: pointer;
 }
-.handle[data-handle="tl"] { top: -7px; left: -7px; cursor: nwse-resize; }
-.handle[data-handle="tr"] { top: -7px; right: -7px; cursor: nesw-resize; }
-.handle[data-handle="bl"] { bottom: -7px; left: -7px; cursor: nesw-resize; }
-.handle[data-handle="br"] { bottom: -7px; right: -7px; cursor: nwse-resize; }
+.handle[data-handle="tl"] { top: 8px;    left: 8px;  cursor: nwse-resize; }
+.handle[data-handle="tr"] { top: 8px;    right: 8px; cursor: nesw-resize; }
+.handle[data-handle="bl"] { bottom: 8px; left: 8px;  cursor: nesw-resize; }
+.handle[data-handle="br"] { bottom: 8px; right: 8px; cursor: nwse-resize; }
 
 #toolbar {
   position: fixed;
