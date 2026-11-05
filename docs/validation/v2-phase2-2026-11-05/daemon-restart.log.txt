@@ -1,0 +1,53 @@
+Using touchpad device: /dev/input/event17
+Loading dictionary (top 30k English words via wordfreq)...
+Dictionary loaded: 29152 words.
+Session type: wayland -> using ydotool for injection.
+Socket listening at: /tmp/swipetype-phase2-qkyqew95/runtime/swipetype.sock
+Overlay socket listening at: /tmp/swipetype-phase2-qkyqew95/runtime/swipetype-overlay.sock
+Daemon idle. Run cli/swipetype_toggle.py to switch modes.
+[toggle] now: SWIPE_MODE (grabbed)
+  WORD: 'world'  (dt=564ms, path_len=22.66)
+    top-5: world(1.16), worked(1.82), would(2.15), works(2.19), worried(2.25)
+[toggle] now: IDLE (ungrabbed)
+[toggle] now: SWIPE_MODE (grabbed)
+  WORD: 'test'  (dt=567ms, path_len=6.12)
+    top-5: test(1.33), that(1.79), text(1.82), treat(1.93), great(1.98)
+[toggle] now: IDLE (ungrabbed)
+[toggle] now: SWIPE_MODE (grabbed)
+  WORD: 'hello'  (dt=564ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=565ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=565ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=566ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=567ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=565ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=565ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=566ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=562ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=557ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=558ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=563ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=566ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=567ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=566ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=567ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+  WORD: 'hello'  (dt=564ms, path_len=10.63)
+    top-5: hello(1.50), help(1.69), hero(2.16), hell(2.23), heel(2.66)
+[toggle] now: IDLE (ungrabbed)
+
+Received signal 15, stopping.

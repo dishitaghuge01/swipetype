@@ -1,0 +1,28 @@
+
+(python:20983): Gtk-WARNING **: 20:14:18.715: Theme parser error: gtk.css:1:1-31: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita.css: No such file or directory
+
+(python:20983): Gtk-WARNING **: 20:14:18.715: Theme parser error: gtk.css:2:1-38: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita-tweaks.css: No such file or directory
+[swipetype-overlay] connected to daemon overlay socket.
+[swipetype-overlay] LayerShell.is_layer_window() -> True
+
+(python:20983): Gdk-WARNING **: 20:14:18.801: Vulkan: Loader Message: setup_loader_term_phys_devs:  Failed to detect any valid GPUs in the current config
+
+(python:20983): Gdk-WARNING **: 20:14:18.801: vkEnumeratePhysicalDevices(): Initialization of an object could not be completed for implementation-specific reasons. (VK_ERROR_INITIALIZATION_FAILED) (-3)
+[swipetype-overlay] dev mode: watching /home/dishita/swipetype/overlay-app/ui for changes (hot reload).
+[swipetype-overlay] daemon mode -> swipe
+[swipetype-overlay] page load FINISHED; init() sent (saved layout: None).
+[swipetype-overlay] daemon mode -> idle
+[swipetype-overlay] daemon mode -> swipe
+[swipetype-overlay] WebKit web process terminated (0) -- reloading page.
+[swipetype-overlay] page load FINISHED; init() sent (saved layout: None).
+[swipetype-overlay] flushing 15 event(s) to JS: ['clear', 'point', 'point', 'point', 'point', 'point', 'point', 'point', 'point', 'point', 'point', 'point', 'point', 'point', 'point']
+[swipetype-overlay] flushing 1 event(s) to JS: ['commit']
+[swipetype-overlay] daemon overlay socket closed -- will retry.
+[swipetype-overlay] daemon mode -> idle
+[swipetype-overlay] connected to daemon overlay socket.
+[swipetype-overlay] daemon mode -> idle
+[swipetype-overlay] daemon mode -> swipe
+[swipetype-overlay] flushing 2 event(s) to JS: ['clear', 'point']
+[swipetype-overlay] flushing 1 event(s) to JS: ['commit']
+[swipetype-overlay] daemon mode -> idle
+[swipetype-overlay] layout saved: {'cx': 0.42, 'cy': 0.44, 'w': 0.65}

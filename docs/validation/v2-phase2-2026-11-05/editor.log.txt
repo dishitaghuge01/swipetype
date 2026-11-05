@@ -1,0 +1,8 @@
+
+(python:10406): Gtk-WARNING **: 19:34:10.930: Theme parser error: gtk.css:1:1-31: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita.css: No such file or directory
+
+(python:10406): Gtk-WARNING **: 19:34:10.930: Theme parser error: gtk.css:2:1-38: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita-tweaks.css: No such file or directory
+
+(python:10406): Gdk-WARNING **: 19:34:10.976: Vulkan: Loader Message: setup_loader_term_phys_devs:  Failed to detect any valid GPUs in the current config
+
+(python:10406): Gdk-WARNING **: 19:34:10.976: vkEnumeratePhysicalDevices(): Initialization of an object could not be completed for implementation-specific reasons. (VK_ERROR_INITIALIZATION_FAILED) (-3)

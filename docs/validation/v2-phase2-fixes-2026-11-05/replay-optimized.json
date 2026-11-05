@@ -1,0 +1,119 @@
+{
+  "source": "working tree",
+  "logical_cpus": 12,
+  "idle": {
+    "seconds": 10.010374268000305,
+    "processes": {
+      "22468": {
+        "name": "python",
+        "cpu_percent_one_core": 0.1,
+        "memory_mib": 127.12,
+        "memory_kind": "PSS"
+      },
+      "22479": {
+        "name": "WebKitNetworkPr",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 32.53,
+        "memory_kind": "PSS"
+      },
+      "22492": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22497": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22498": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22501": {
+        "name": "WebKitWebProces",
+        "cpu_percent_one_core": 0.1,
+        "memory_mib": 150.74,
+        "memory_kind": "PSS"
+      },
+      "22493": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22494": {
+        "name": "xdg-dbus-proxy",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.68,
+        "memory_kind": "PSS"
+      }
+    },
+    "cpu_percent_one_core": 0.2,
+    "cpu_percent_normalized_logical_cpus": 0.02,
+    "memory_mib": 311.59
+  },
+  "active": {
+    "seconds": 10.014357394000399,
+    "processes": {
+      "22468": {
+        "name": "python",
+        "cpu_percent_one_core": 23.97,
+        "memory_mib": 129.14,
+        "memory_kind": "PSS"
+      },
+      "22479": {
+        "name": "WebKitNetworkPr",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 32.47,
+        "memory_kind": "PSS"
+      },
+      "22492": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22497": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22498": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22501": {
+        "name": "WebKitWebProces",
+        "cpu_percent_one_core": 29.26,
+        "memory_mib": 165.12,
+        "memory_kind": "PSS"
+      },
+      "22493": {
+        "name": "bwrap",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.13,
+        "memory_kind": "PSS"
+      },
+      "22494": {
+        "name": "xdg-dbus-proxy",
+        "cpu_percent_one_core": 0.0,
+        "memory_mib": 0.68,
+        "memory_kind": "PSS"
+      }
+    },
+    "cpu_percent_one_core": 53.23,
+    "cpu_percent_normalized_logical_cpus": 4.44,
+    "memory_mib": 327.93
+  },
+  "points_sent": 1208,
+  "dev_mode": false,
+  "scope": "Overlay process tree only; excludes compositor/daemon/GPU power"
+}

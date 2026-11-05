@@ -1,0 +1,183 @@
+[
+    {
+        "test": "words_with_overlay",
+        "status": "PASS",
+        "expected": "hello world ",
+        "actual": "hello world ",
+        "overlay": {
+            "mode": "swipe",
+            "opacity": "1",
+            "keys": 26,
+            "rect": {
+                "x": 0,
+                "y": 227.4375,
+                "w": 1920,
+                "h": 625.109375,
+                "vw": 1920,
+                "vh": 1080
+            }
+        }
+    },
+    {
+        "test": "one_finger_character_delete",
+        "status": "PASS",
+        "actual": "hello world"
+    },
+    {
+        "test": "two_finger_word_delete_after_character_delete",
+        "status": "PASS",
+        "actual": "hello "
+    },
+    {
+        "test": "focus_during_typing",
+        "status": "PASS",
+        "editor": {
+            "text": "hello ",
+            "clicks": 0,
+            "active": true,
+            "focus": true,
+            "pid": 10406
+        }
+    },
+    {
+        "test": "click_through",
+        "status": "PASS",
+        "before_clicks": 0,
+        "editor": {
+            "text": "hello ",
+            "clicks": 1,
+            "active": true,
+            "focus": true,
+            "pid": 10406
+        }
+    },
+    {
+        "test": "typing_after_overlay_exit",
+        "status": "PASS",
+        "before": "hello ",
+        "actual": "hello test ",
+        "daemon_alive": true
+    },
+    {
+        "test": "overlay_connects_during_swipe_mode",
+        "status": "FAIL",
+        "expected": "swipe",
+        "actual": "idle"
+    },
+    {
+        "test": "webkit_crash_recovery",
+        "status": "PASS",
+        "killed": [
+            10666
+        ],
+        "replacement": [
+            10722
+        ],
+        "loads": 2,
+        "daemon_alive": true,
+        "before": "hello test ",
+        "actual": "hello test hello "
+    },
+    {
+        "test": "daemon_disconnect_visual_state",
+        "status": "OBSERVED",
+        "overlay_mode": "swipe"
+    },
+    {
+        "test": "daemon_restart_initial_mode",
+        "status": "FAIL",
+        "expected": "idle",
+        "actual": "swipe"
+    },
+    {
+        "test": "daemon_restart_reconnect",
+        "status": "PASS",
+        "actual": "hello test hello world ",
+        "before": "hello test hello ",
+        "overlay_pid": 10628,
+        "overlay": {
+            "mode": "swipe",
+            "opacity": "1",
+            "keys": 26,
+            "rect": {
+                "x": 0,
+                "y": 227.4375,
+                "w": 1920,
+                "h": 625.109375,
+                "vw": 1920,
+                "vh": 1080
+            }
+        }
+    },
+    {
+        "test": "layout_survives_restart",
+        "status": "PASS",
+        "saved_file": {
+            "version": 1,
+            "cx": 0.42,
+            "cy": 0.44,
+            "w": 0.65
+        },
+        "restored": {
+            "cx": 0.42,
+            "cy": 0.44,
+            "w": 0.65
+        },
+        "rendered_rect": {
+            "x": 182.390625,
+            "y": 272.03125,
+            "w": 1248,
+            "h": 406.3125,
+            "vw": 1920,
+            "vh": 1080
+        },
+        "method": "Real JS bridge layout message; physical drag not tested"
+    },
+    {
+        "test": "corrupt_layout_fallback",
+        "status": "PASS",
+        "restored": null,
+        "rendered_rect": {
+            "x": 0,
+            "y": 227.4375,
+            "w": 1920,
+            "h": 625.109375,
+            "vw": 1920,
+            "vh": 1080
+        }
+    },
+    {
+        "test": "disabled_overlay_no_webkit_helpers",
+        "status": "PASS",
+        "window": false,
+        "processes": [
+            [
+                10976,
+                "python"
+            ]
+        ]
+    },
+    {
+        "test": "typing_with_disabled_overlay",
+        "status": "PASS",
+        "before": "hello test hello world ",
+        "actual": "hello test hello world test ",
+        "window": false
+    },
+    {
+        "test": "performance_idle",
+        "status": "MEASURED",
+        "output": "Overlay root PID 11000. Sampling for 10s ...\n\n     PID  process                    mem MB   CPU %\n   11000  python                      111.2     0.0\n   11015  WebKitNetworkPr              32.1     0.0\n   11030  bwrap                         0.1     0.0\n   11031  bwrap                         0.1     0.0\n   11032  xdg-dbus-proxy                0.7     0.0\n   11035  bwrap                         0.1     0.0\n   11036  bwrap                         0.1     0.0\n   11039  WebKitWebProces             140.5     0.0\n          TOTAL (PSS)                 285.0     0.0\n",
+        "synthetic_gestures": 0,
+        "dev_mode": false,
+        "overlay_pid": 11000
+    },
+    {
+        "test": "performance_active",
+        "status": "MEASURED",
+        "output": "Overlay root PID 11000. Sampling for 10s ...\n\n     PID  process                    mem MB   CPU %\n   11000  python                      113.1    15.1\n   11015  WebKitNetworkPr              32.1     0.0\n   11030  bwrap                         0.1     0.0\n   11031  bwrap                         0.1     0.0\n   11032  xdg-dbus-proxy                0.7     0.0\n   11035  bwrap                         0.1     0.0\n   11036  bwrap                         0.1     0.0\n   11039  WebKitWebProces             155.0    44.7\n          TOTAL (PSS)                 301.4    59.8\n",
+        "synthetic_gestures": 17,
+        "dev_mode": false,
+        "overlay_pid": 11000
+    }
+]

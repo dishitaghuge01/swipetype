@@ -1,0 +1,12 @@
+
+(python:10900): Gtk-WARNING **: 19:34:40.870: Theme parser error: gtk.css:1:1-31: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita.css: No such file or directory
+
+(python:10900): Gtk-WARNING **: 19:34:40.870: Theme parser error: gtk.css:2:1-38: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita-tweaks.css: No such file or directory
+[swipetype-overlay] connected to daemon overlay socket.
+[swipetype-overlay] LayerShell.is_layer_window() -> True
+
+(python:10900): Gdk-WARNING **: 19:34:40.954: Vulkan: Loader Message: setup_loader_term_phys_devs:  Failed to detect any valid GPUs in the current config
+
+(python:10900): Gdk-WARNING **: 19:34:40.954: vkEnumeratePhysicalDevices(): Initialization of an object could not be completed for implementation-specific reasons. (VK_ERROR_INITIALIZATION_FAILED) (-3)
+[swipetype-overlay] dev mode: watching /home/dishita/swipetype/overlay-app/ui for changes (hot reload).
+[swipetype-overlay] page load FINISHED; init() sent (saved layout: None).
