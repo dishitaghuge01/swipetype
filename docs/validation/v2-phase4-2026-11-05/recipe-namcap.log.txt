@@ -1,0 +1,9 @@
+
+packaging/PKGBUILD
+exit=0
+
+packaging/deps/python-locate/PKGBUILD
+exit=0
+
+packaging/deps/python-wordfreq/PKGBUILD
+exit=0

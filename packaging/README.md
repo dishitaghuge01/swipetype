@@ -72,16 +72,24 @@ sudo pacman -S --needed base-devel git python-build python-installer \
 Install/build the existing `python-ftfy` AUR package through your normal reviewed
 AUR workflow (e.g. `paru -S python-ftfy` if you use paru). Then:
 
+Build outside any activated virtualenv; the explicit clean environment also
+protects third-party recipes/tools that select Python through PATH:
+
 ```bash
-(cd packaging/deps/python-locate && makepkg -si)
-(cd packaging/deps/python-wordfreq && makepkg -si)
+(cd packaging/deps/python-locate && env -u VIRTUAL_ENV -u PYTHONHOME -u PYTHONPATH PATH=/usr/bin:/bin makepkg -si)
+(cd packaging/deps/python-wordfreq && env -u VIRTUAL_ENV -u PYTHONHOME -u PYTHONPATH PATH=/usr/bin:/bin makepkg -si)
 ```
+
+The reviewed `python-ftfy` AUR recipe additionally needs `python-hatchling` and
+`python-pytest` from the official repositories for its build/test steps.
 
 Neither dependency is a `-git` package. `python-wordfreq` preserves Apache-2.0
 code notices plus the bundled data's CC-BY-SA-4.0/source attribution notice.
 CJK extras and optional language-name datasets are not needed for English typing.
-Dependency wheel builds themselves have not yet been exercised on this machine;
-install their prerequisites and complete that check in Phase 4.
+Phase 4 has built/linted `python-locate` successfully after fixing a venv-prefix
+contamination bug; its corrected archive is not installed yet. ftfy and wordfreq
+build/install checks remain pending. See the [Phase 4 progress record](../docs/validation/v2-phase4-2026-11-05.md)
+for current evidence and remaining installation gates.
 
 ## Local app build (no AUR account needed)
 
@@ -190,7 +198,9 @@ venv/pycache, optional dependency split, and a local `--nodeps` archive smoke bu
 Before release:
 
 - Build dependency recipes with installed prerequisites, then app without `--nodeps`.
-- `namcap PKGBUILD` and both resulting archives (namcap not yet installed here).
+- `namcap PKGBUILD` and both resulting archives. Namcap is now available and
+  exposed a split-build dependency issue that is fixed; final dependency-resolved
+  app archives still need rechecking.
 - Build in a clean Arch chroot; verify dependency declarations and offline build
   phases after makepkg has acquired the declared sources.
 - Test installed core only; then optional overlay, cold/warm shortcut, login

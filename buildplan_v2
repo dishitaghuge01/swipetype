@@ -155,7 +155,13 @@ checksums, `.SRCINFO`, and local development source override are included.
 3. 🆕 Confirm the overlay subpackage now has `webkitgtk-6.0` and `python-cairo` in `depends`, installs `swipetype_overlay.py` **and** `ui/` into `/usr/share/swipetype-overlay/`, and installs the launcher to `/usr/bin/swipetype-overlay`. Confirm no `package_*()` function references the old direct-to-`/usr/bin` install of the Python file.
 4. If Path B (no overlay on your machine): still include the overlay subpackage; note in `pkgdesc` or a comment that you haven't personally tested it running.
 
-## Phase 4 — local build and test via makepkg ⏳ (modified)
+## Phase 4 — local build and test via makepkg ⏳ (in progress)
+
+Preflight and dependency validation have started. Split-build dependencies and
+venv-selected Python prefixes were fixed in separate commits, and a corrected
+locate archive passed lint/import checks. Installed app migration and clean-chroot
+checks are pending; do not mark this phase done yet. See the
+[Phase 4 progress record](docs/validation/v2-phase4-2026-11-05.md).
 
 1. `cd packaging && makepkg -si` — watch each of `build()`, `package_swipetype-git()`, `package_swipetype-overlay-git()`.
 2. Ignore your dev checkout entirely; test purely against the installed package: `systemctl --user daemon-reload`, `systemctl --user start swipetype.service`, `systemctl --user status swipetype.service`.

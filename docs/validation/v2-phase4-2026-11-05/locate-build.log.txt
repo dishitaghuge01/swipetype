@@ -1,0 +1,83 @@
+==> Making package: python-locate 1.1.1-2 (Thu 05 Nov 2026 10:08:59 PM IST)
+==> Checking runtime dependencies...
+==> Checking buildtime dependencies...
+==> Retrieving sources...
+  -> Found locate-1.1.1.tar.gz
+==> Validating source files with sha256sums...
+    locate-1.1.1.tar.gz ... Passed
+==> Removing existing $srcdir/ directory...
+==> Extracting sources...
+  -> Extracting locate-1.1.1.tar.gz with bsdtar
+==> Removing existing $pkgdir/ directory...
+==> Starting build()...
+* Getting build dependencies for wheel...
+* Building wheel...
+running bdist_wheel
+running build
+running build_py
+creating build/lib/locate
+copying locate/__init__.py -> build/lib/locate
+copying locate/version.py -> build/lib/locate
+copying locate/_locate.py -> build/lib/locate
+copying locate/py.typed -> build/lib/locate
+installing to build/bdist.linux-x86_64/wheel
+running install
+running install_lib
+creating build/bdist.linux-x86_64/wheel
+creating build/bdist.linux-x86_64/wheel/locate
+copying build/lib/locate/__init__.py -> build/bdist.linux-x86_64/wheel/./locate
+copying build/lib/locate/version.py -> build/bdist.linux-x86_64/wheel/./locate
+copying build/lib/locate/_locate.py -> build/bdist.linux-x86_64/wheel/./locate
+copying build/lib/locate/py.typed -> build/bdist.linux-x86_64/wheel/./locate
+running install_egg_info
+running egg_info
+writing locate.egg-info/PKG-INFO
+writing dependency_links to locate.egg-info/dependency_links.txt
+writing top-level names to locate.egg-info/top_level.txt
+reading manifest file 'locate.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'locate.egg-info/SOURCES.txt'
+Copying locate.egg-info to build/bdist.linux-x86_64/wheel/./locate-1.1.1-py3.14.egg-info
+running install_scripts
+creating build/bdist.linux-x86_64/wheel/locate-1.1.1.dist-info/WHEEL
+creating '/home/dishita/swipetype/packaging/deps/python-locate/src/locate-1.1.1/dist/.tmp-_alzuk3i/locate-1.1.1-py3-none-any.whl' and adding 'build/bdist.linux-x86_64/wheel' to it
+adding 'locate/__init__.py'
+adding 'locate/_locate.py'
+adding 'locate/py.typed'
+adding 'locate/version.py'
+adding 'locate-1.1.1.dist-info/licenses/LICENSE'
+adding 'locate-1.1.1.dist-info/METADATA'
+adding 'locate-1.1.1.dist-info/WHEEL'
+adding 'locate-1.1.1.dist-info/top_level.txt'
+adding 'locate-1.1.1.dist-info/RECORD'
+removing build/bdist.linux-x86_64/wheel
+WARNING License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: Other/Proprietary License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+Successfully built locate-1.1.1-py3-none-any.whl
+==> Starting check()...
+==> Entering fakeroot environment...
+==> Starting package()...
+==> Tidying install...
+  -> Removing libtool files...
+  -> Removing static library files...
+  -> Purging unwanted files...
+  -> Stripping unneeded symbols from binaries and libraries...
+  -> Compressing man and info pages...
+==> Checking for packaging issues...
+==> Creating package "python-locate"...
+  -> Generating .PKGINFO file...
+  -> Generating .BUILDINFO file...
+  -> Generating .MTREE file...
+  -> Compressing package...
+==> Leaving fakeroot environment.
+==> Finished making: python-locate 1.1.1-2 (Thu 05 Nov 2026 10:09:01 PM IST)
