@@ -4,7 +4,8 @@
 Usage: python scratch/check_package_payloads.py CORE.pkg.tar.zst OVERLAY.pkg.tar.zst
 Imports their Python code as your user: do not use on untrusted packages.
 No daemon/application instance is constructed, no input is injected, and no
-service is started. System Python and an empty cwd prevent checkout/venv imports.
+service is started. System Python and a foreign cwd test checkout independence
+and prevent unrelated cwd configuration from shadowing the private module.
 """
 import argparse
 import hashlib
@@ -75,8 +76,9 @@ def check(core, overlay):
             assert not url.scheme and not url.netloc, asset
         # CSS's optional local Inter fonts may be absent; system fonts are the
         # intentional fallback. This audits references, not network isolation.
-        empty = root / 'empty-cwd'
-        empty.mkdir()
+        foreign = root / 'foreign-cwd'
+        foreign.mkdir()
+        (foreign / 'config.py').write_text('raise RuntimeError("wrong cwd config imported")\n')
         core_dir = root / 'usr/share/swipetype'
         overlay_dir = root / 'usr/share/swipetype-overlay'
         script = r'''
@@ -113,7 +115,7 @@ print(json.dumps({'python':sys.executable,'prefix':sys.prefix,'modules':modules,
                   'overlay_imported':True,'helper_target':command[1]}))
 '''
         output = subprocess.check_output(['/usr/bin/python', '-I', '-c', script,
-                                          str(core_dir), str(overlay_dir)], cwd=empty, text=True)
+                                          str(core_dir), str(overlay_dir)], cwd=foreign, text=True)
         return {'packages': metadata, 'imports_and_decoder': json.loads(output),
                 'relative_html_assets': assets.paths,
                 'scope': 'Extracted-payload/import/static-asset checks; not installed runtime or network isolation'}

@@ -25,7 +25,9 @@ import signal
 import sys
 import threading
 
-sys.path.insert(0, ".")  # allow running from repo root
+# Resolve private modules beside this file, never from an unrelated working
+# directory (e.g. a user's home containing its own config.py).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from capture.touchpad import TouchpadCapture, find_touchpad_device
 from capture.socket_listener import SocketListener
