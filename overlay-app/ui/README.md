@@ -52,6 +52,10 @@ Open `overlay-app/ui/index.html?demo` in Firefox or Chromium. The page replays t
 
 ## Dev mode in the real overlay
 
+First stop `swipetype-overlay.service` and any other overlay instance. Otherwise
+GApplication forwards to the existing owner, whose dev-mode environment cannot
+be changed by starting a second process. Restart the service when finished.
+
 ```bash
 SWIPETYPE_OVERLAY_DEV=1 python overlay-app/swipetype_overlay.py
 ```

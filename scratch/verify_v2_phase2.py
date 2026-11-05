@@ -4,6 +4,8 @@
 Run from the checkout: .venv/bin/python scratch/verify_v2_phase2.py
 Requires an unlocked Hyprland 0.57+ (Lua dispatch) session, uinput access,
 ydotoold, and overlay deps. Exits nonzero on observed failures/errors.
+Stop swipetype-overlay.service and any manual overlay first, then restart it
+afterwards: private test sockets do not isolate GApplication's session-bus ID.
 DO NOT interact with the desktop while running: synthetic input targets a test
 editor. Focus is checked before gestures/clicks; use only in a disposable session.
 Uses private sockets/config/state; never restarts the user's normal service.

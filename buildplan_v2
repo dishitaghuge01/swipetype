@@ -1,0 +1,189 @@
+# Build Plan, phase-wise, sequential — SwipeType v2 (rev 2)
+
+Companion to `prd_v2.md`. Section references (§) point into that PRD.
+
+**Status legend:** ✅ done and pushed · 🟢 implemented/validated locally (not pushed) · 🔁 replaced by rev 2 · 🆕 new in rev 2 · ⏳ pending · ⏸ blocked/deferred.
+
+**Phase 2 verification (2026-11-05):** implementation is present; automated desktop
+integration checks passed for synthetic word/delete gestures, click-through/focus,
+overlay exit, WebKit crash recovery, disabled startup, and layout persistence/
+corruption fallback. Initial mode snapshots on connect/reconnect failed; fixed and re-verified in
+`7253469`. Rendering optimization `897478b` reduced matched replay CPU from 71.9%
+to 53.2% of one logical CPU (~6.0% to ~4.4% normalized across this laptop's 12
+logical CPUs). The low-single-digit expectation needs an explicit workload and
+CPU convention before treating it as an acceptance threshold; it is not claimed
+passed under the one-core convention. The user subsequently confirmed that
+physical use works fine and feels natural and smooth. Phase 2 is ready to hand
+off to Phase 3 packaging, retaining the measured CPU baseline and unmeasured
+battery/thermal impact as documented limitations rather than claiming every
+original numerical target passed. See [baseline](docs/validation/v2-phase2-2026-11-05.md)
+and [fixes and user confirmation](docs/validation/v2-phase2-fixes-2026-11-05.md).
+
+**Phase 3 status:** 🟢 recipes and metadata prepared in `cb099ea`, with optional
+session-managed overlay automation in `13db1f9`. A local non-installing archive
+smoke build passed, but dependency-installed/clean-chroot testing remains Phase 4.
+See [packaging instructions and deliberate deviations](packaging/README.md).
+Phase 5 is ⏸ deferred while AUR registration is closed; no submission or push
+has been attempted. Maintainer email: ghugedishita@gmail.com.
+
+## Delta from rev 1 (what actually changes in the work)
+
+| Area | Change |
+|---|---|
+| Phase 0 | ✅ original items stay done; 🆕 four new decision/recon items (D1–D4) |
+| Phase 1 (config + device auto-detect) | ✅ untouched |
+| Phase 2, steps 1–4 (deps, broadcaster, segmenter hooks, daemon wiring) | ✅ untouched; one 🆕 dependency install (`webkitgtk-6.0`) |
+| Phase 2, step 5 (GTK4 DrawingArea client) | 🔁 **replaced** by stages 2a–2h below |
+| Phase 3 (PKGBUILD) | 🟢 authored, staged and archive-smoke-tested locally; see `packaging/` |
+| Phase 4 (local build/test) | ⏳ modified: more to verify (web process, UI paths, RAM) |
+| Phase 5 (AUR submission) | ⏸ registration closed; metadata prepared, no submission |
+| Phase 6 (maintenance notes) | ⏳ unchanged + two new notes |
+
+---
+
+## Phase 0 — decisions and account setup (blocking, do first)
+
+1. ✅ Confirm license choice (default MIT; repo-root `LICENSE` with standard MIT text, your name, current year).
+2. ✅ Run Step 0's compositor check (`echo $XDG_CURRENT_DESKTOP`). Record: Path A (overlay buildable) or Path B (skip Phase 2).
+3. ⏸ Confirm/create AUR account + SSH key (Step 0 item 3): registration currently closed per user; no account creation/submission attempted.
+4. ✅ Working copy exists; `git remote -v` points at `https://github.com/dishitaghuge01/swipetype.git`.
+5. 🆕 **D1 — UI source.** Decide: hand-written static UI with Lovable as design reference (default) vs. "Path L" (commit a built Lovable `dist/`). Record the choice at the top of `overlay-app/ui/README.md` (one line). Everything below assumes the default.
+6. 🆕 **D2 — layout-mode trigger.** Accept the default (`gapplication action dev.dishitaghuge.swipetype.overlay layout` bound to a compositor key), or pick another key combo. Write the exact keybind line you'll use.
+7. 🆕 **D3 — GPU recon.** `lspci | grep -iE 'vga|3d'`. Note the vendor/driver; it decides how worried to be about gate S2.
+8. 🆕 **D4 — package facts.** `pacman -Si webkitgtk-6.0`; `pacman -Ql webkitgtk-6.0 | grep -i typelib` (expect `WebKit-6.0` and `JavaScriptCore-6.0`); `pacman -Ql gtk4-layer-shell | grep '\.so'` (note the exact path for §9.6). If `webkitgtk-6.0` doesn't exist on your system, stop and reassess — nothing below works without it.
+
+## Phase 1 — config.yaml + device auto-detection ✅ (shipped; listed for completeness)
+
+1. `pip install pyyaml --break-system-packages` (or into your `.venv`).
+2. `config.py` exactly as PRD §6.
+3. `find_touchpad_device()` in `capture/touchpad.py` per PRD §7.
+4. `daemon.py`: hardcoded `DEVICE_PATH` removed; `main()` calls `config.load_config()`, then `device_path = cfg["device_path"] or find_touchpad_device()`.
+5. Test auto-detect with an empty `config.yaml`; swipe-typing still works.
+6. Test the override path with an explicit `device_path`.
+7. `config.yaml` written with both default keys and committed (becomes the AUR package's `backup=()` file).
+
+## Phase 2 — Ghost overlay (Path A only — skip entirely if Path B)
+
+### Steps 1–4 — backend hooks ✅ (shipped, unchanged)
+
+1. Install dependencies: `sudo pacman -S gtk4 gtk4-layer-shell python-gobject` and 🆕 `webkitgtk-6.0`.
+2. ✅ `overlay/broadcaster.py` exactly as PRD §8.2.
+3. ✅ `gesture/segmenter.py`: `on_gesture_start` / `on_point` hooks per §8.3; existing decode/flick tests re-run to confirm no regression.
+4. ✅ `daemon.py` per §8.4: construct `OverlayBroadcaster`, wire the two segmenter callbacks, start it in `run()`, broadcast mode/clear on toggle, broadcast commit on word.
+
+### Step 5 🔁 — Overlay client rebuilt on WebKitGTK, in stages (replaces the old GTK `DrawingArea` client)
+
+Do the stages in order. Each ends with a concrete check. **Stage 2a is a go/no-go gate.**
+
+**2a. 🆕 Spike — prove the platform works before designing anything (gate).**
+Create throwaway `scratch/spike_webkit.py` (not shipped):
+1. Full-output layer-shell window (all four anchors, `OVERLAY` layer, exclusive zone `-1`, keyboard mode `NONE`) containing a `WebKit.WebView` loading an inline/`file://` page: transparent background, one semi-transparent red square, and a button.
+2. Set the background transparent in all three places (GTK CSS, `webview.set_background_color`, page CSS) per §8.5.
+3. Call, once each, the API shapes from §8.6: `evaluate_javascript(js, -1, None, None, None, None)` (change the button color), `register_script_message_handler("swipetype", None)` + `script-message-received::swipetype` (button click → Python print), `WebKit.NetworkSession.new_ephemeral()`. Fix the snippets to whatever the real signatures are. *(Gate S1.)*
+4. Checks:
+   - **S2:** you can see your desktop/windows through the transparent area (not black, not white).
+   - **S4:** with `set_input_region(cairo.Region())` applied on `map`, click a window *under* the overlay — the click reaches it; typing in that window keeps working (focus not stolen).
+   - Flip to `set_input_region(None)`: the button now receives clicks (this is layout mode's mechanism).
+   - **S6:** `set_visible(False)` then `set_visible(True)` — the page still renders, still transparent, input region behavior still correct after re-map.
+   - **S3:** the window actually appears as a layer surface (fills the output, above other windows) with `WebKit` imported. If not, retry with `LD_PRELOAD=<path from D4>`; then confirm the web process still launches.
+5. **Outcomes:**
+   - All pass → continue. Record which env flags (if any) you needed; they go into §9.6's launcher.
+   - S2 fails on your GPU → try `WEBKIT_DISABLE_DMABUF_RENDERER=1`, then `WEBKIT_DISABLE_COMPOSITING_MODE=1`. If still opaque/black → stop; the fallback is rev 1's Cairo overlay (already shipped in git history), improved directly with Cairo (rounded-rect keys, a tapered gradient trail). Report back rather than pushing on.
+
+**2b. 🆕 UI bundle in a plain browser (no daemon, no compositor).**
+1. Create `overlay-app/ui/{index.html,style.css,overlay.js}` and `demo/{keys.js,demo-path.js}` per §8.7.1. `demo-path.js` is generated from `scratch/last_swipe.json`'s `key_space_path` (the recorded "appropriate" swipe already in your repo) — a one-off script or hand conversion is fine.
+2. Implement in `overlay.js`: the `window.swipetype` API surface (`init`, `events`, `setMode`) as stubs, the coordinate mapping (§8.7.2), key generation from the injected map (§8.7.3), and demo self-init when `?demo` is present or no bridge exists (§8.8).
+3. Style the keys in `style.css`: `0.94u` squares, rounded corners, legends, faint glass look (no `backdrop-filter` — it does nothing here, §8.7.3). This is the stage where you bring in Lovable-designed values (colors, radii, gradients, fonts — self-host any fonts in `ui/fonts/`).
+4. Add `scratch/check_ui_keys.py` (§8.8.3) and run it.
+5. **Check:** open `index.html?demo` in Firefox: three staggered rows of square keys at 1:1 pitch, visually matching your keyboard's proportions; resizing the browser window rescales cleanly; keys match `KEY_CENTERS`.
+
+**2c. 🆕 The comet (still in the browser).**
+1. Implement the renderer per §8.7.4: point ring buffer with timestamps, head smoothing, quadratic-midpoint curve, tapered width, age-based alpha, white core + glow pass, head glow disc, `requestAnimationFrame` only while the buffer is non-empty, DPR-aware canvas.
+2. Put every tunable at the top of `overlay.js` (`TRAIL_MS`, `HEAD_WIDTH`, `TAIL_WIDTH`, `SMOOTHING`, `GLOW`).
+3. Implement the word flash (CSS transition) driven by `commit`.
+4. **Check:** the demo loop shows a smooth, corner-free comet: bright head, tail tapering and fading, tail fully gone ~0.4 s after the path ends, no idle CPU use between loops (confirm with the browser's performance tab or `top`). Tune constants until it looks right. *This is the stage where you iterate on the look — it needs no Python.*
+
+**2d. 🆕 Host app: WebKit view in the layer-shell window (static content).**
+1. Rewrite `overlay-app/swipetype_overlay.py` per §8.5: keep the class shell, sys.path bootstrap, application id, socket thread; drop `DrawingArea`/Cairo drawing code; add the full-output layer-shell setup, transparent webview, ephemeral session, navigation lock, `UI_DIR = <this file's dir>/ui`.
+2. Load `index.html` (no `?demo`), and after `load-changed` FINISHED call `window.swipetype.init(...)` with `KEY_CENTERS`, the stage constants, and `layout: null`.
+3. Temporarily call `setMode("swipe")` at startup and force-show the window.
+4. **Check:** run `python overlay-app/swipetype_overlay.py` — the real keys generated from `decoder.geometry.KEY_CENTERS` appear full-screen, transparent, positioned identically to the browser preview; fully click-through (empty input region).
+
+**2e. 🆕 Event bridge: socket → JS.**
+1. Implement `_enqueue`/`_flush` (§8.6) in the socket handler path: all four event types (`mode`, `clear`, `point`, `commit`) are enqueued in order; `_page_ready` gates flushing; cap the pre-ready queue.
+2. In `overlay.js`, implement `events(batch)` dispatch: `point` → comet buffer, `clear` → empty buffer, `commit` → flash. (`mode` is handled in 2f.)
+3. **Check:** run `daemon.py` in one terminal and the overlay in another, toggle swipe mode, swipe a word — the comet follows your finger live over the keys where the decoder thinks it is (start a swipe on a physical corner of the trackpad → comet starts at the corresponding corner key), and the committed word flashes.
+
+**2f. 🆕 Modes and click-through.**
+1. Implement the Python mode state machine (§8.5 table): `IDLE`/`SWIPE`/`LAYOUT`, `set_visible`, input region set on every mode change and every `map`, `setMode(...)` sent on every transition; `mode` events from the daemon drive `IDLE`↔`SWIPE`; config re-read on each `mode: true` (rev 1 behavior kept).
+2. Implement **lazy webview creation**: `_ensure_window()` at startup only if `enabled` is true, otherwise on first `mode: true`/`layout` with `enabled` true.
+3. **Check:** toggle on → overlay appears; toggle off → disappears; clicks pass through the overlay to the app beneath; focus stays in your text editor while swiping and words still inject. Set `ghost_overlay.enabled: false`: no WebKit helper processes appear (`pgrep -a WebKit`), daemon unaffected.
+
+**2g. 🆕 Layout mode — move, resize, persist.**
+1. Python: `Gio.SimpleAction("layout")` on the app; `LAYOUT` mode = `surface.set_input_region(None)` + `setMode("layout")`; load `overlay-layout.json` (§5.2) at init and pass it as `layout`; handle JS messages `layout` (validate, clamp, atomic write), `layout-reset` (delete file), `layout-done` (→ `IDLE`); `mode: true` from the daemon exits layout mode.
+2. JS: `#scrim`, dashed outline, four corner handles, toolbar (Fit screen / Reset / Done); drag-to-move and aspect-locked corner-resize with pointer capture; live CSS updates; one message on pointer-up (§8.7.6).
+3. Bind your D2 keybind (Hyprland example: `bind = SUPER SHIFT, space, exec, gapplication action dev.dishitaghuge.swipetype.overlay layout`).
+4. **Check:**
+   - With swipe mode off, the keybind shows the scrim + handles; you can drag the keyboard, resize it by a corner (aspect never distorts), click **Done**; the layout is applied.
+   - Quit and restart the overlay → the layout is restored.
+   - **Reset** → default "fit to screen" and the state file is gone.
+   - Toggling swipe mode on while in layout mode leaves layout mode cleanly; swiping then works and trace coordinates still line up with the (moved/resized) keys.
+   - The layout keybind pressed during swipe mode does nothing harmful.
+   - Delete/corrupt the state file → falls back to the default without a crash.
+
+**2h. 🆕 Dev workflow and hardening.**
+1. `SWIPETYPE_OVERLAY_DEV=1`: developer extras on, `Gio.FileMonitor` on `ui/` → `webview.reload()`; page re-initializes through the ready → init path.
+2. Socket reconnect (every 2 s) verified with the webview alive; daemon restart doesn't break the overlay.
+3. Confirm the JS bridge survives a page reload (init re-sent on each FINISHED).
+4. Measure: idle RSS of the overlay process tree (`ps` over the process + WebKit helpers), and CPU while swiping (should be low single digits; if not, look at canvas size/DPR first — risk S5).
+5. Optional polish: nearest-key `.active` glow under the comet head (§8.7.3).
+6. Add a short `overlay-app/ui/README.md`: file map, tunables list, how to run browser preview and dev mode.
+
+**Test end to end:** run `daemon.py` in one terminal and `swipetype-overlay` (or the python file) in another; toggle swipe mode; swipe a word into a text editor; confirm (a) the comet draws live and smoothly, (b) the committed word flashes, (c) the overlay is click-through and doesn't steal focus, (d) injection is unaffected by the overlay being there.
+
+**Test the daemon-without-overlay case (G2):** kill the overlay process (and separately `kill -9` just the WebKit web process), confirm `daemon.py` keeps working normally — broadcast calls to zero clients are silent no-ops. Verify explicitly.
+
+## Phase 3 — PKGBUILD authoring 🟢 (prepared locally)
+
+The implementation uses system Python with explicit dependencies, not the old
+sample's copied venv. Missing dependency recipes, shortcut helper/service,
+checksums, `.SRCINFO`, and local development source override are included.
+`packaging/README.md` is authoritative for the actual install/release workflow.
+
+1. Create the `packaging/` directory with the files in PRD §9.2–9.6: `PKGBUILD`, `swipetype.service`, `swipetype-daemon`, `swipetype-toggle`, and 🆕 `swipetype-overlay` (the launcher; include the commented env-flag lines and enable only the ones Stage 2a proved necessary).
+2. 🟢 Maintainer set to `Dishita Ghuge <ghugedishita@gmail.com>` in all authored recipes.
+3. 🆕 Confirm the overlay subpackage now has `webkitgtk-6.0` and `python-cairo` in `depends`, installs `swipetype_overlay.py` **and** `ui/` into `/usr/share/swipetype-overlay/`, and installs the launcher to `/usr/bin/swipetype-overlay`. Confirm no `package_*()` function references the old direct-to-`/usr/bin` install of the Python file.
+4. If Path B (no overlay on your machine): still include the overlay subpackage; note in `pkgdesc` or a comment that you haven't personally tested it running.
+
+## Phase 4 — local build and test via makepkg ⏳ (modified)
+
+1. `cd packaging && makepkg -si` — watch each of `build()`, `package_swipetype-git()`, `package_swipetype-overlay-git()`.
+2. Ignore your dev checkout entirely; test purely against the installed package: `systemctl --user daemon-reload`, `systemctl --user start swipetype.service`, `systemctl --user status swipetype.service`.
+3. Run `swipetype-toggle`, swipe a test sentence into a text editor, confirm injection works identically to your dev setup.
+4. If Path A: run `swipetype-overlay` (v1 keeps it manual). 🆕 Confirm specifically: the UI loads from `/usr/share/swipetype-overlay/ui/` (not from your checkout — temporarily rename your checkout to prove it), the keys and comet render, the layout keybind works, and dragging then **Done** writes `~/.local/state/swipetype/overlay-layout.json` (proving the state path is writable when installed under root-owned `/usr/share`).
+5. 🆕 Confirm offline behavior: with networking disabled, the overlay looks identical (no remote fonts/assets accidentally referenced); `grep -rnE 'https?://' /usr/share/swipetype-overlay/ui` should show nothing meaningful.
+6. Install `namcap` (`sudo pacman -S namcap`) and run `namcap packaging/PKGBUILD` and `namcap` against both built `.pkg.tar.zst` files — fix anything flagged (common: missing/redundant dependencies, permissions). 🆕 Expect scrutiny of `python-cairo`/`webkitgtk-6.0` dependency detection and file permissions under `ui/`.
+7. Uninstall (`sudo pacman -R swipetype-git swipetype-overlay-git`), reinstall via `makepkg -si` again from clean, confirm it's reproducible.
+
+## Phase 5 — AUR submission ⏸ (deferred)
+
+Registration is currently closed. Recheck package-name/dependency availability
+before submission. The local `python-locate` and `python-wordfreq` recipes may
+also need publication after Phase 4. No AUR Git operation is automated here.
+
+1. Generate `.SRCINFO`: `cd packaging && makepkg --printsrcinfo > .SRCINFO`.
+2. Clone the (currently nonexistent) AUR repo — AUR auto-creates it on first push: `git clone ssh://aur@aur.archlinux.org/swipetype-git.git`.
+3. Copy `PKGBUILD`, `.SRCINFO` and the seven local sources listed by `source=()` (four launchers, two services, desktop entry) into that cloned directory. AUR repos hold packaging files only; publish the application commits to GitHub first so the VCS source contains the new code.
+4. `git add -A && git commit -m "Initial import: swipetype-git 1.0.0" && git push origin master`.
+5. Use **one** AUR Git repository for `pkgbase=swipetype-git`; its split `.SRCINFO` publishes both package listings. Do not duplicate the same split recipe into a second `swipetype-overlay-git.git` repo. Recheck current AUR conventions at submission time.
+6. Wait a few minutes, then verify both `https://aur.archlinux.org/packages/swipetype-git` and `.../swipetype-overlay-git` show up.
+7. Test outside-in on a different machine or fresh Arch VM/container: `paru -S swipetype-git` (or `yay`), confirm it builds and installs with zero manual intervention. 🆕 For the overlay, on a Sway/Hyprland machine, confirm `paru -S swipetype-overlay-git` pulls in `webkitgtk-6.0` automatically and the overlay runs.
+
+## Phase 6 — maintenance notes (read, don't execute)
+
+- For a `-git` package, AUR helpers re-run `pkgver()` on update checks — you don't bump `pkgver` for new commits. Bump `pkgrel` (reset to 1 only on a `pkgver` change) only when you change the PKGBUILD itself without an upstream commit.
+- After any PKGBUILD change: regenerate `.SRCINFO` before committing — a stale `.SRCINFO` is one of the most common AUR flagging reasons.
+- If you ever wire more `config.yaml` tunables (NG4), keep `backup=("usr/share/swipetype/config.yaml")` — pacman preserves a user's edited config across updates (`.pacnew`). Remember the packaged `config.yaml` is root-owned; per-user runtime state (like overlay layout) belongs under `~/.local/state/swipetype/`, not in that file.
+- 🆕 **Restyling the overlay** = edit `overlay-app/ui/style.css` (and constants at the top of `overlay.js`), preview with `index.html?demo`, commit. No PKGBUILD change is needed unless you add new files (they're picked up by the `cp -r` of `ui/`) or new dependencies.
+- 🆕 If a future WebKitGTK or gtk4-layer-shell update breaks transparency or layering, re-run the Stage 2a spike (`scratch/spike_webkit.py`) first — it isolates platform issues from your code.
+- 🆕 If you later want GNOME/KDE support (NG1), the webview UI is reusable as-is; only the host window (layer-shell → a regular always-on-top transparent window or a shell-extension approach) would need a second backend.
