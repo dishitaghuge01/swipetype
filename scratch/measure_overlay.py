@@ -15,6 +15,9 @@ Run it twice and compare:
 
 PSS counts shared memory pages proportionally, so summing it across
 processes doesn't double-count shared libraries the way RSS does.
+Memory is reported in MiB. CPU is percent of one logical CPU (100% =
+one CPU-second per second); a separately labeled normalized total is
+also printed. Neither value measures GPU load or battery power.
 """
 
 import os
@@ -107,6 +110,8 @@ def main():
         sys.exit(1)
 
     print(f"Overlay root PID {root}. Sampling for {seconds:.0f}s ...")
+    logical_cpus = os.cpu_count() or 1
+    print(f"CPU: 100% = one logical CPU; {logical_cpus} logical CPUs online.")
     s1 = sample(root)
     t1 = time.monotonic()
     time.sleep(seconds)
@@ -116,7 +121,7 @@ def main():
     total_cpu = 0.0
     total_mem = 0
     kind = "PSS"
-    print(f"\n{'PID':>8}  {'process':<24} {'mem MB':>8}  {'CPU %':>6}")
+    print(f"\n{'PID':>8}  {'process':<24} {'mem MiB':>8}  {'CPU %':>6}")
     for pid, (comm, ticks2, mem_kb, k) in sorted(s2.items()):
         kind = k
         if pid in s1:
@@ -127,6 +132,8 @@ def main():
         total_mem += mem_kb
         print(f"{pid:>8}  {comm:<24} {mem_kb / 1024:>8.1f}  {cpu:>6.1f}")
     print(f"{'':>8}  {'TOTAL (' + kind + ')':<24} {total_mem / 1024:>8.1f}  {total_cpu:>6.1f}")
+    print(f"CPU total normalized across {logical_cpus} logical CPUs: "
+          f"{total_cpu / logical_cpus:.1f}% (not a power estimate)")
 
 
 if __name__ == "__main__":

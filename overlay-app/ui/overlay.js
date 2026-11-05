@@ -8,7 +8,7 @@
  *
  * Key generation + coordinate mapping, comet renderer, layout mode
  * (drag / aspect-locked corner resize / Fit screen / Reset / Done),
- * and a nearest-key ".active" glow under the comet head.
+ * and a cached nearest-key glow under the comet head.
  *
  * Perf note: the comet is drawn with layered translucent strokes, NOT
  * canvas shadowBlur. shadowBlur on ~40 segments per frame measured at
@@ -26,6 +26,7 @@
   const SMOOTHING = 0.55;        // head lerp factor, removes touchpad jitter
   const HEAD_DISC_FRESH_MS = 80; // head glow disc shows while last point < this old
   const ACTIVE_KEY_FRESH_MS = 150; // nearest-key glow shows while last point < this old
+  const TRAIL_BUCKETS = 8;       // batch strokes by age, not one draw call per point
 
   // Stroke passes, drawn back to front for every segment. "width" is a
   // multiplier on the segment's tapered base width; "alpha" is the max
@@ -44,7 +45,8 @@
   let lastRect = null; // most recent computeLayoutRect() result
 
   let keyEls = {};         // letter -> DOM element (rebuilt by renderKeys)
-  let activeLetter = null; // key currently carrying the .active class
+  let activeLetter = null;
+  let activeGlowEl = null; // one cached, translated glow instead of repainting keys
 
   let cometPoints = [];        // [{kx, ky, t}], t = performance.now()
   let cometHeadKx = null;      // smoothed head, in key-space
@@ -132,15 +134,24 @@
       keysEl.appendChild(div);
       keyEls[letter] = div;
     }
+    activeGlowEl = document.createElement("div");
+    activeGlowEl.className = "gk-active-glow";
+    keysEl.appendChild(activeGlowEl);
   }
 
   // ---- nearest-key glow ----
 
   function setActiveKey(letter) {
     if (letter === activeLetter) return;
-    if (activeLetter && keyEls[activeLetter]) keyEls[activeLetter].classList.remove("active");
-    if (letter && keyEls[letter]) keyEls[letter].classList.add("active");
     activeLetter = letter;
+    if (!activeGlowEl) return;
+    if (letter && lastRect) {
+      const [px, py] = keyToStagePx(...KEYS[letter], lastRect);
+      activeGlowEl.style.transform = `translate3d(${px}px, ${py}px, 0) translate(-50%, -50%)`;
+      activeGlowEl.style.opacity = "1";
+    } else {
+      activeGlowEl.style.opacity = "0";
+    }
   }
 
   function nearestKey(kx, ky) {
@@ -170,6 +181,7 @@
   }
 
   function relayout() {
+    if (!STAGE) return; // a resize may precede the host's init() after reload
     lastRect = computeLayoutRect();
     applyLayoutRect(lastRect);
     resizeCometCanvas(lastRect);
@@ -197,6 +209,8 @@
     cometPoints = [];
     cometHeadKx = null;
     cometHeadKy = null;
+    if (cometRafId !== null) cancelAnimationFrame(cometRafId);
+    cometRafId = null;
     cometCtx.clearRect(0, 0, cometCanvas.width, cometCanvas.height);
     setActiveKey(null);
   }
@@ -211,37 +225,36 @@
     return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   }
 
-  function strokeQuad(from, ctrl, to, pointT, now, u, pass) {
-    const age = Math.min(1, (now - pointT) / TRAIL_MS);
-    const fade = Math.pow(1 - age, 1.5);
-    const alpha = pass.alpha * fade;
-    if (alpha <= 0.01) return;
-
-    const widthFrac = 1 - age; // 1 at head, 0 at tail
-    const baseWidth = (TAIL_WIDTH_U + (HEAD_WIDTH_U - TAIL_WIDTH_U) * widthFrac) * u;
-
-    cometCtx.beginPath();
-    cometCtx.moveTo(from.x, from.y);
-    cometCtx.quadraticCurveTo(ctrl.x, ctrl.y, to.x, to.y);
-    cometCtx.lineCap = "round";
-    cometCtx.strokeStyle = `rgba(${pass.rgb}, ${alpha})`;
-    cometCtx.lineWidth = baseWidth * pass.width;
-    cometCtx.stroke();
-  }
-
   function drawCometPass(pxPoints, now, u, pass) {
-    const n = pxPoints.length;
-    if (n === 2) {
-      strokeQuad(pxPoints[0], pxPoints[0], pxPoints[1], pxPoints[1].t, now, u, pass);
-      return;
+    // Adjacent segments in the same age bucket share a single stroke.
+    // Keep midpoint Beziers, taper and fade, but bound draw calls to
+    // TRAIL_BUCKETS per pass regardless of touchpad sampling rate.
+    const buckets = Array.from({ length: TRAIL_BUCKETS }, () => []);
+    for (let i = 1; i < pxPoints.length; i++) {
+      const p = pxPoints[i];
+      const age = clamp((now - p.t) / TRAIL_MS, 0, 1);
+      buckets[Math.min(TRAIL_BUCKETS - 1, Math.floor(age * TRAIL_BUCKETS))].push(i);
     }
-    // Smooth-polyline technique: each interior point is a Bezier
-    // control point between the midpoints of its neighboring
-    // segments -- no visible corners.
-    for (let i = 1; i < n - 1; i++) {
-      const prevMid = midpoint(pxPoints[i - 1], pxPoints[i]);
-      const nextMid = midpoint(pxPoints[i], pxPoints[i + 1]);
-      strokeQuad(prevMid, pxPoints[i], nextMid, pxPoints[i].t, now, u, pass);
+    for (let b = 0; b < buckets.length; b++) {
+      if (!buckets[b].length) continue;
+      const age = (b + 0.5) / TRAIL_BUCKETS;
+      const alpha = pass.alpha * Math.pow(1 - age, 1.5);
+      if (alpha <= 0.01) continue;
+      cometCtx.beginPath();
+      let previous = -2;
+      for (const i of buckets[b]) {
+        const p = pxPoints[i];
+        const from = i === 1 ? pxPoints[0] : midpoint(pxPoints[i - 1], p);
+        const to = i === pxPoints.length - 1 ? p : midpoint(p, pxPoints[i + 1]);
+        if (i !== previous + 1) cometCtx.moveTo(from.x, from.y);
+        cometCtx.quadraticCurveTo(p.x, p.y, to.x, to.y);
+        previous = i;
+      }
+      cometCtx.lineCap = "round";
+      cometCtx.lineJoin = "round";
+      cometCtx.strokeStyle = `rgba(${pass.rgb}, ${alpha})`;
+      cometCtx.lineWidth = (TAIL_WIDTH_U + (HEAD_WIDTH_U - TAIL_WIDTH_U) * (1 - age)) * u * pass.width;
+      cometCtx.stroke();
     }
   }
 
@@ -273,9 +286,7 @@
         t: p.t,
       }));
 
-      for (const pass of COMET_PASSES) {
-        drawCometPass(pxPoints, now, u, pass);
-      }
+      for (const pass of COMET_PASSES) drawCometPass(pxPoints, now, u, pass);
 
       const last = pxPoints[pxPoints.length - 1];
       if (now - last.t < HEAD_DISC_FRESH_MS) {
@@ -450,6 +461,7 @@
 
     setMode(mode) {
       document.body.dataset.mode = mode; // "idle" | "swipe" | "layout"
+      if (mode !== "swipe") clearComet();
     },
   };
 

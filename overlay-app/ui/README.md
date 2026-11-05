@@ -20,7 +20,11 @@ Layout-mode trigger: the same keybind as the overlay-visibility toggle (PRD D2, 
 
 ## Tunables
 
-At the top of `overlay.js`: `TRAIL_MS`, `HEAD_WIDTH_U`, `TAIL_WIDTH_U`, `SMOOTHING`, `HEAD_DISC_FRESH_MS`, `ACTIVE_KEY_FRESH_MS`, and `COMET_PASSES` (the layered glow and core strokes; no canvas blur, which was a CPU hotspot). Key look: `.gk-key` in `style.css`. Everything is sized in units of `--u` (pixels per key-unit), set by JS.
+At the top of `overlay.js`: `TRAIL_MS`, `HEAD_WIDTH_U`, `TAIL_WIDTH_U`, `SMOOTHING`, `HEAD_DISC_FRESH_MS`, `ACTIVE_KEY_FRESH_MS`, `TRAIL_BUCKETS`, and `COMET_PASSES` (the layered glow and core strokes; no canvas blur). Age buckets batch neighboring curves, bounding strokes to `3 × TRAIL_BUCKETS` per frame instead of one per point/pass. Nearest-key feedback uses one cached `.gk-active-glow` translated over the static keys rather than changing their box shadows. Key look: `.gk-key` in `style.css`. Everything is sized in units of `--u` (pixels per key-unit), set by JS.
+
+The 420 ms tail and animation frame rate are unchanged. Clearing a gesture or entering idle/layout mode cancels outstanding animation immediately; a hidden overlay drops incoming trace events. The host sends the current daemon mode to newly connected clients and returns to idle on disconnect.
+
+Hardware-free regression checks: `python -m unittest discover -s tests -v` and `node tests/test_overlay_ui.cjs`. For CPU comparisons without synthetic input injection, use `python scratch/profile_overlay.py --seconds 10` (see its help for comparing a Git revision). CPU is reported per logical core and normalized across logical CPUs; normalized CPU is not a battery-power estimate.
 
 ## Preview in a plain browser (no daemon, no compositor)
 
