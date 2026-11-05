@@ -24,6 +24,9 @@ class OverlayBroadcaster:
         self._server_socket: Optional[socket.socket] = None
         self._clients: List[socket.socket] = []
         self._clients_lock = threading.Lock()
+        # Guarded by _clients_lock so a new client's snapshot cannot race
+        # with (or arrive after) a newer mode broadcast.
+        self._swipe_mode = False
         self._thread: Optional[threading.Thread] = None
         self._running = False
 
@@ -46,11 +49,19 @@ class OverlayBroadcaster:
             except OSError:
                 break
             with self._clients_lock:
-                self._clients.append(conn)
+                try:
+                    snapshot = {"event": "mode", "swipe_mode": self._swipe_mode}
+                    conn.sendall((json.dumps(snapshot) + "\n").encode("utf-8"))
+                except OSError:
+                    conn.close()
+                else:
+                    self._clients.append(conn)
 
     def _broadcast(self, event: dict) -> None:
         line = (json.dumps(event) + "\n").encode("utf-8")
         with self._clients_lock:
+            if event.get("event") == "mode":
+                self._swipe_mode = event["swipe_mode"]
             dead = []
             for client in self._clients:
                 try:
@@ -79,6 +90,10 @@ class OverlayBroadcaster:
     def stop(self) -> None:
         self._running = False
         if self._server_socket is not None:
+            try:
+                self._server_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
             self._server_socket.close()
         with self._clients_lock:
             for c in self._clients:

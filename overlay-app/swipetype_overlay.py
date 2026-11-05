@@ -181,6 +181,7 @@ class OverlayApp(Gtk.Application):
         self._page_ready = False
         self._pending: list[dict] = []
         self._flush_id: int | None = None
+        self._visual_mode = "idle"
 
         self._ui_monitor: Gio.FileMonitor | None = None
         self._reload_id: int | None = None
@@ -271,6 +272,7 @@ class OverlayApp(Gtk.Application):
 
         settings = self.webview.get_settings()
         settings.set_enable_developer_extras(DEV_MODE)
+        settings.set_enable_write_console_messages_to_stdout(DEV_MODE)
 
         # Navigation lock (G8 offline enforcement).
         self.webview.connect("decide-policy", self._on_decide_policy)
@@ -463,9 +465,6 @@ class OverlayApp(Gtk.Application):
         self._refresh_visual_state()
 
     def _refresh_visual_state(self) -> None:
-        if self.window is None:
-            return
-
         # LAYOUT takes priority over everything else.
         if self.layout_mode_active:
             visual_mode = "layout"
@@ -474,6 +473,9 @@ class OverlayApp(Gtk.Application):
         else:
             visual_mode = "idle"
 
+        self._visual_mode = visual_mode
+        if self.window is None:
+            return
         opacity = "0" if visual_mode == "idle" else "1"
 
         if self._page_ready:
@@ -499,14 +501,14 @@ class OverlayApp(Gtk.Application):
 
     def _socket_loop(self) -> None:
         while True:
+            sock = None
             try:
                 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 sock.connect(SOCKET_PATH)
             except OSError:
-                # Daemon not running, or hasn't started its overlay
-                # socket yet. Retry rather than crash -- the overlay
-                # should never be a reason the whole system needs
-                # restarting.
+                # Close failed attempts promptly rather than relying on GC.
+                if sock is not None:
+                    sock.close()
                 time.sleep(RECONNECT_INTERVAL_S)
                 continue
 
@@ -535,8 +537,17 @@ class OverlayApp(Gtk.Application):
                 except OSError:
                     pass
 
+            # Queued on the same GLib context as received events, before
+            # any subsequent connection's snapshot. Never leave a stale
+            # swipe keyboard visible while the daemon is gone.
+            GLib.idle_add(self._on_disconnect)
             _log("daemon overlay socket closed -- will retry.")
             time.sleep(RECONNECT_INTERVAL_S)
+
+    def _on_disconnect(self) -> bool:
+        self._pending = []
+        self._apply_mode("idle")
+        return False
 
     # ---- Event bridge: socket -> JS, batched (PRD section 8.6) ----
 
@@ -545,8 +556,8 @@ class OverlayApp(Gtk.Application):
         if etype == "mode":
             self._apply_mode("swipe" if event.get("swipe_mode") else "idle")
             return False
-        if self.window is None:
-            return False  # no window -> nothing to render; don't queue forever
+        if self.window is None or self._visual_mode != "swipe":
+            return False  # hidden/disabled overlays must not animate offscreen
         self._enqueue(event)
         return False
 
