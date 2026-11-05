@@ -88,8 +88,9 @@ code notices plus the bundled data's CC-BY-SA-4.0/source attribution notice.
 CJK extras and optional language-name datasets are not needed for English typing.
 Phase 4 has built/linted and verified the system installation of `python-locate`
 after fixing a venv-prefix contamination bug. The reviewed ftfy recipe also built
-successfully (336 passed, 10 expected failures) and awaits user installation;
-wordfreq build/install checks remain pending. See the [Phase 4 progress record](../docs/validation/v2-phase4-2026-11-05.md)
+successfully (336 passed, 10 expected failures), was installed by the user and
+passes post-install lint/import checks. Wordfreq has now built and passed staged
+English-corpus/decoder checks; its user installation is the next gate. See the [Phase 4 progress record](../docs/validation/v2-phase4-2026-11-05.md)
 for current evidence and remaining installation gates.
 
 ## Local app build (no AUR account needed)

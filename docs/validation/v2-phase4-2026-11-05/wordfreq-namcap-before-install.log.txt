@@ -1,0 +1,16 @@
+wordfreq archive lint before system installation
+python-wordfreq W: Referenced python module 'mecab_ko_dic' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/mecab.py'])
+python-wordfreq W: Referenced python module 'wordfreq.mecab.mecab_tokenize' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/tokens.py'])
+python-wordfreq W: Referenced python module 'wordfreq.tokens.simple_tokenize' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/__init__.py'])
+python-wordfreq W: Referenced python module 'jieba' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/chinese.py'])
+python-wordfreq W: Referenced python module 'wordfreq.tokens.lossy_tokenize' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/__init__.py'])
+python-wordfreq W: Referenced python module 'wordfreq.numbers.smash_numbers' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/__init__.py'])
+python-wordfreq W: Referenced python module 'wordfreq.chinese.jieba_tokenize' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/tokens.py'])
+python-wordfreq W: Referenced python module 'ipadic' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/mecab.py'])
+python-wordfreq W: Referenced python module 'wordfreq.chinese.simplify_chinese' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/tokens.py'])
+python-wordfreq W: Referenced python module 'wordfreq.tokens.tokenize' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/__init__.py'])
+python-wordfreq W: Referenced python module 'wordfreq.numbers.digit_freq' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/__init__.py'])
+python-wordfreq W: Referenced python module 'wordfreq.numbers.has_digit_sequence' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/__init__.py'])
+python-wordfreq W: Referenced python module 'MeCab' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/mecab.py'])
+python-wordfreq W: Referenced python module 'wordfreq.language_info.get_language_info' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/__init__.py'])
+exit=0

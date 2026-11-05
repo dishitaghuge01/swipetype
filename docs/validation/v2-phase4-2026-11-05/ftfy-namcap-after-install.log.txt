@@ -1,0 +1,2 @@
+ftfy archive lint after verified system installation
+exit=0

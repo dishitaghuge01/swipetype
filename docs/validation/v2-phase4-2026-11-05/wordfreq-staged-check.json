@@ -1,0 +1,12 @@
+{
+  "interpreter": "/usr/bin/python",
+  "prefix": "/usr",
+  "wordfreq_module": "/tmp/swipetype-wordfreq-payload-6e4v0ek1/usr/lib/python3.14/site-packages/wordfreq/__init__.py",
+  "dictionary_entries": 29152,
+  "ideal_path_decodes": {
+    "hello": "hello",
+    "world": "world",
+    "test": "test",
+    "help": "help"
+  }
+}
