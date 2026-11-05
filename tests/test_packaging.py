@@ -14,6 +14,12 @@ PACKAGING = ROOT / 'packaging'
 RECIPES = (PACKAGING / 'PKGBUILD', *sorted((PACKAGING / 'deps').glob('*/PKGBUILD')))
 
 
+def shell_launchers(directory):
+    # makepkg outputs share this prefix; archives and unit files are not shell.
+    return sorted(path for path in directory.glob('swipetype-*')
+                  if path.is_file() and not path.suffix)
+
+
 def shell(script, *args, **kwargs):
     env = os.environ.copy()
     env.pop('SWIPETYPE_SOURCE_URL', None)
@@ -123,12 +129,19 @@ class PackagingTests(unittest.TestCase):
             self.assertNotRegex(text, r'(?<![/\w-])python\s+-(?:m|c)\b', str(recipe))
             self.assertIn('/usr/bin/python', text, str(recipe))
 
+    def test_shell_discovery_ignores_generated_archives(self):
+        with tempfile.TemporaryDirectory(prefix='swipetype-shell-discovery-') as temp:
+            directory = Path(temp)
+            (directory / 'swipetype-daemon').write_text('#!/bin/sh\nexit 0\n')
+            (directory / 'swipetype-git-r1.hash-1-any.pkg.tar.zst').write_bytes(b'not shell')
+            (directory / 'swipetype.service').write_text('[Unit]\nDescription=not shell\n')
+            self.assertEqual([path.name for path in shell_launchers(directory)], ['swipetype-daemon'])
+
     def test_recipes_and_launchers_have_valid_shell_syntax(self):
         for path in RECIPES:
             subprocess.run(['bash', '-n', path], check=True)
-        for path in PACKAGING.glob('swipetype-*'):
-            if path.is_file() and path.suffix != '.service':
-                subprocess.run(['sh', '-n', path], check=True)
+        for path in shell_launchers(PACKAGING):
+            subprocess.run(['sh', '-n', path], check=True)
 
 
 if __name__ == '__main__':
