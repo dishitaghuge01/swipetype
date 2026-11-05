@@ -18,7 +18,11 @@ AUR push, pacman installation or upstream Git push was performed here.
 - Dependency source releases are pinned with SHA-256 checksums. Their build
   backends use `--no-isolation`; all build dependencies are declared.
 - The overlay and its helper use system PyGObject. The core has no GTK/WebKit
-  dependency and can run without an overlay installation or process.
+  runtime dependency and can run without an overlay installation or process.
+  Building the split recipe requires the external dependency union in
+  `makedepends`, including GTK/WebKit; makepkg resolves that before running the
+  package-specific functions. This does not broaden the core archive's runtime
+  dependencies.
 - User services are tied to `graphical-session.target`, inherit the session type
   instead of forcing Wayland, and stop with the graphical session. The core unit
   does not assume your distribution supplies a `ydotoold.service` of that name.

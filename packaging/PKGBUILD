@@ -6,7 +6,11 @@ pkgrel=1
 arch=('any')
 url='https://github.com/dishitaghuge01/swipetype'
 license=('MIT')
-makedepends=('git' 'python')
+# makepkg resolves dependencies before package_*() runs. A split build needs
+# the external dependency union here; each installed package still has its own
+# narrow runtime depends array below.
+makedepends=('git' 'python' 'python-evdev>=2.0' 'python-yaml' 'python-wordfreq>=3.1.1'
+             'python-gobject' 'python-cairo' 'gtk4' 'gtk4-layer-shell' 'webkitgtk-6.0' 'systemd')
 
 # Local development only: SWIPETYPE_SOURCE_URL="file:///absolute/path/to/checkout"
 # Leave unset when generating .SRCINFO for publication.

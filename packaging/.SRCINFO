@@ -6,6 +6,15 @@ pkgbase = swipetype-git
 	license = MIT
 	makedepends = git
 	makedepends = python
+	makedepends = python-evdev>=2.0
+	makedepends = python-yaml
+	makedepends = python-wordfreq>=3.1.1
+	makedepends = python-gobject
+	makedepends = python-cairo
+	makedepends = gtk4
+	makedepends = gtk4-layer-shell
+	makedepends = webkitgtk-6.0
+	makedepends = systemd
 	source = swipetype::git+https://github.com/dishitaghuge01/swipetype.git
 	source = swipetype-daemon
 	source = swipetype-toggle

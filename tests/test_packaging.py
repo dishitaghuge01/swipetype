@@ -1,6 +1,7 @@
 """Stage both package functions without root, downloads, GTK, or system changes."""
 import hashlib
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
@@ -56,6 +57,14 @@ class PackagingTests(unittest.TestCase):
         deps = self.dependencies['swipetype-git']
         self.assertIn('python-wordfreq>=3.1.1', deps)
         self.assertFalse(any('gtk' in p or 'gobject' in p or 'webkit' in p for p in deps))
+
+    def test_build_dependencies_cover_split_external_dependencies(self):
+        declared = shell('source "$1"; printf "%s\\0" "${makedepends[@]}"',
+                         PACKAGING / 'PKGBUILD').decode().rstrip('\0').split('\0')
+        base_name = lambda dependency: re.split(r'[<>=]', dependency, maxsplit=1)[0]
+        required = {base_name(dep) for deps in self.dependencies.values() for dep in deps}
+        required.difference_update(self.stages)  # sibling packages are built here
+        self.assertLessEqual(required, {base_name(dep) for dep in declared})
 
     def test_overlay_host_and_ui_are_siblings(self):
         stage = self.stages['swipetype-overlay-git']
