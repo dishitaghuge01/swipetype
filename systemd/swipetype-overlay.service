@@ -1,0 +1,18 @@
+# Checkout-only unit. Copy to ~/.config/systemd/user/ and adjust the path if needed.
+# The packaged variant lives in packaging/swipetype-overlay.service.
+[Unit]
+Description=SwipeType ghost-keyboard overlay (checkout)
+PartOf=graphical-session.target
+After=graphical-session.target swipetype.service
+Wants=swipetype.service
+
+[Service]
+Type=dbus
+BusName=dev.dishitaghuge.swipetype.overlay
+WorkingDirectory=%h/swipetype
+ExecStart=%h/swipetype/.venv/bin/python %h/swipetype/overlay-app/swipetype_overlay.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

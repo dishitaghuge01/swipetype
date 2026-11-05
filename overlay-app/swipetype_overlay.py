@@ -162,7 +162,12 @@ def _delete_layout() -> None:
 
 class OverlayApp(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id="dev.dishitaghuge.swipetype.overlay")
+        super().__init__(application_id="dev.dishitaghuge.swipetype.overlay",
+                         flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+        self.add_main_option("toggle", 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE,
+                             "Start the overlay if needed, then toggle visibility/layout", None)
+        self.add_main_option("show", 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE,
+                             "Show the keyboard (swiping) or layout editor (idle)", None)
         self.window: Gtk.ApplicationWindow | None = None
         self.webview: WebKit.WebView | None = None
 
@@ -182,6 +187,9 @@ class OverlayApp(Gtk.Application):
         self._pending: list[dict] = []
         self._flush_id: int | None = None
         self._visual_mode = "idle"
+        self._mode_known = False
+        self._pending_actions: list[str] = []
+        self._action_timeout_id: int | None = None
 
         self._ui_monitor: Gio.FileMonitor | None = None
         self._reload_id: int | None = None
@@ -198,6 +206,24 @@ class OverlayApp(Gtk.Application):
 
     # ---- GTK application lifecycle ----
 
+    def do_startup(self) -> None:
+        Gtk.Application.do_startup(self)
+        self._register_actions()
+
+    def do_command_line(self, command_line) -> int:
+        options = command_line.get_options_dict()
+        toggle, show = options.contains("toggle"), options.contains("show")
+        if toggle and show:
+            command_line.printerr_literal("Use either --toggle or --show, not both.\n")
+            return 2
+        cold_start = not self._activated
+        self.activate()
+        if toggle or show:
+            # Starting an absent overlay should show it, not immediately
+            # hide its default-visible keyboard after the mode snapshot.
+            self._request_overlay_action("show" if show or cold_start else "toggle")
+        return 0
+
     def do_activate(self) -> None:
         if self._activated:
             if self.window is not None:
@@ -209,7 +235,6 @@ class OverlayApp(Gtk.Application):
         # creation: ghost_overlay.enabled may be false at startup).
         self.hold()
 
-        self._register_actions()
         self._start_socket_thread()
 
         if self._overlay_enabled():
@@ -221,6 +246,9 @@ class OverlayApp(Gtk.Application):
         toggle_action = Gio.SimpleAction.new("toggle-overlay", None)
         toggle_action.connect("activate", self._on_toggle_overlay_action)
         self.add_action(toggle_action)
+        show_action = Gio.SimpleAction.new("show-overlay", None)
+        show_action.connect("activate", lambda *_: self._request_overlay_action("show"))
+        self.add_action(show_action)
 
     def _ensure_window(self) -> None:
         if self.window is None:
@@ -432,9 +460,10 @@ class OverlayApp(Gtk.Application):
 
     # ---- Mode / visibility state machine ----
 
-    def _apply_mode(self, mode: str) -> None:
-        """Called for daemon.py's real 'mode' socket events (IDLE<->SWIPE only)."""
+    def _apply_mode(self, mode: str, *, known: bool = True) -> None:
+        """Socket snapshots establish state before deferred shortcut actions."""
         self.mode = mode
+        self._mode_known = known
         if mode == "swipe":
             if self.layout_mode_active:
                 # Swipe mode always wins -- leave layout mode cleanly.
@@ -446,23 +475,41 @@ class OverlayApp(Gtk.Application):
                 self._ensure_window()
         _log(f"daemon mode -> {mode}")
         self._refresh_visual_state()
+        if known:
+            self._drain_overlay_actions()
 
     def _on_toggle_overlay_action(self, _action, _param) -> None:
-        if not self._overlay_enabled():
-            _log("toggle-overlay ignored -- ghost_overlay.enabled is false.")
-            return
-        self._ensure_window()
+        self._request_overlay_action("toggle")
 
-        # Context-sensitive by design: the same key means "show/hide
-        # while swiping" when swipe mode is on, and "edit where it
-        # sits" when swipe mode is off.
-        if self.mode == "swipe":
-            self.overlay_visible = not self.overlay_visible
-            _log(f"overlay_visible preference -> {self.overlay_visible}")
-        else:
-            self.layout_mode_active = not self.layout_mode_active
-            _log(f"layout_mode_active -> {self.layout_mode_active}")
+    def _request_overlay_action(self, action: str) -> None:
+        if not self._activated:
+            self.activate()
+        if not self._overlay_enabled():
+            _log(f"{action} ignored -- ghost_overlay.enabled is false.")
+            return
+        self._pending_actions.append(action)
+        if self._mode_known:
+            self._drain_overlay_actions()
+        elif self._action_timeout_id is None:
+            # Usually the socket snapshot arrives immediately. If the daemon
+            # is absent, still allow offline layout editing after a short wait.
+            self._action_timeout_id = GLib.timeout_add(2500, self._drain_overlay_actions)
+
+    def _drain_overlay_actions(self) -> bool:
+        if self._action_timeout_id is not None:
+            GLib.source_remove(self._action_timeout_id)
+            self._action_timeout_id = None
+        actions, self._pending_actions = self._pending_actions, []
+        if not actions or not self._overlay_enabled():
+            return False
+        self._ensure_window()
+        for action in actions:
+            if self.mode == "swipe":
+                self.overlay_visible = True if action == "show" else not self.overlay_visible
+            else:
+                self.layout_mode_active = True if action == "show" else not self.layout_mode_active
         self._refresh_visual_state()
+        return False
 
     def _refresh_visual_state(self) -> None:
         # LAYOUT takes priority over everything else.
@@ -546,7 +593,7 @@ class OverlayApp(Gtk.Application):
 
     def _on_disconnect(self) -> bool:
         self._pending = []
-        self._apply_mode("idle")
+        self._apply_mode("idle", known=False)
         return False
 
     # ---- Event bridge: socket -> JS, batched (PRD section 8.6) ----
@@ -600,7 +647,7 @@ class OverlayApp(Gtk.Application):
 
 def main() -> None:
     app = OverlayApp()
-    app.run(None)
+    raise SystemExit(app.run(sys.argv))
 
 
 if __name__ == "__main__":

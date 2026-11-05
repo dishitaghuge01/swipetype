@@ -2,10 +2,29 @@
 
 UI source: hand-written static HTML/CSS/vanilla JS, with a Lovable export used only as a visual reference (PRD D1 default). There is no build step, no bundler and no npm.
 
-Layout-mode trigger: the same keybind as the overlay-visibility toggle (PRD D2, changed by request). It is the `toggle-overlay` GApplication action, bound in Hyprland as
-`gapplication action dev.dishitaghuge.swipetype.overlay toggle-overlay`.
+Layout-mode trigger: the same keybind as the overlay-visibility toggle (PRD D2, changed by request).
 - Swipe mode ON: show or hide the ghost keyboard.
 - Swipe mode OFF: enter or exit layout mode (drag and resize).
+
+Use `swipetype-overlay-toggle` when installed. It checks the session-bus owner,
+starts `swipetype-overlay.service` if absent, and forwards `--show` (cold start)
+or `--toggle` (already running). No terminal is required. It avoids the absent
+process/desktop-entry problem of a bare `gapplication action` binding.
+
+In a checkout, install `systemd/swipetype-overlay.service` as a user unit (adjust
+its checkout path if necessary), then `systemctl --user daemon-reload` and
+`systemctl --user enable --now swipetype-overlay.service`. Bind an absolute command
+such as `/home/dishita/swipetype/.venv/bin/python /home/dishita/swipetype/cli/swipetype_overlay_toggle.py`.
+The current user's bindings are Super+Ctrl+Space for swipe mode and Super+Shift+K
+for the overlay; the helper does not change the daemon's swipe mode.
+
+The host also accepts `--toggle` and idempotent `--show`, routed to a single
+GApplication instance. A direct cold `--toggle` shows rather than immediately
+hiding the keyboard. Actions wait for the initial daemon mode snapshot; if the
+daemon is absent, layout editing remains available after a 2.5-second fallback.
+The original `toggle-overlay` GApplication action remains available to a running
+application (the `gapplication` command additionally expects an installed desktop
+entry on some GLib versions).
 
 ## Files
 
