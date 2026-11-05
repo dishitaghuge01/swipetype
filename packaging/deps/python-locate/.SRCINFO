@@ -1,7 +1,7 @@
 pkgbase = python-locate
 	pkgdesc = Locate the directory of the current Python script
 	pkgver = 1.1.1
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/AutoActuary/locate
 	arch = any
 	license = MIT

@@ -117,6 +117,12 @@ class PackagingTests(unittest.TestCase):
             generated = subprocess.check_output(['makepkg', '--printsrcinfo'], cwd=recipe.parent, env=env)
             self.assertEqual(generated, (recipe.parent / '.SRCINFO').read_bytes(), str(recipe))
 
+    def test_recipes_do_not_use_path_selected_virtualenv_python(self):
+        for recipe in RECIPES:
+            text = recipe.read_text()
+            self.assertNotRegex(text, r'(?<![/\w-])python\s+-(?:m|c)\b', str(recipe))
+            self.assertIn('/usr/bin/python', text, str(recipe))
+
     def test_recipes_and_launchers_have_valid_shell_syntax(self):
         for path in RECIPES:
             subprocess.run(['bash', '-n', path], check=True)

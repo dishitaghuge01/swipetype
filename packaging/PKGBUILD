@@ -40,7 +40,7 @@ pkgver() {
 check() {
   cd "$srcdir/swipetype"
   # Standard-library tests only: no GTK, touchpad, desktop session or Node needed.
-  python -m unittest discover -s tests -p 'test_*.py' -v
+  /usr/bin/python -m unittest discover -s tests -p 'test_*.py' -v
 }
 
 package_swipetype-git() {

@@ -1,7 +1,7 @@
 pkgbase = python-wordfreq
 	pkgdesc = Word frequencies in many languages, with bundled frequency data
 	pkgver = 3.1.1
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/rspeer/wordfreq
 	arch = any
 	license = Apache-2.0

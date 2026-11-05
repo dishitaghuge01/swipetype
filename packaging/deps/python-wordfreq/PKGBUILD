@@ -2,7 +2,7 @@
 pkgname=python-wordfreq
 _name=wordfreq
 pkgver=3.1.1
-pkgrel=1
+pkgrel=2
 pkgdesc='Word frequencies in many languages, with bundled frequency data'
 arch=('any')
 url='https://github.com/rspeer/wordfreq'
@@ -16,17 +16,17 @@ sha256sums=('7943098975f25c2a70e1151ee5a62083b14a5f86f6cc5703cc9526f716ceb408')
 
 build() {
   cd "$_name-$pkgver"
-  python -m build --wheel --no-isolation
+  /usr/bin/python -m build --wheel --no-isolation
 }
 
 check() {
   cd "$_name-$pkgver"
-  PYTHONPATH="$PWD" python -c 'from wordfreq import top_n_list, word_frequency; assert "the" in top_n_list("en", 100); assert word_frequency("hello", "en") > 0'
+  PYTHONPATH="$PWD" /usr/bin/python -c 'from wordfreq import top_n_list, word_frequency; assert "the" in top_n_list("en", 100); assert word_frequency("hello", "en") > 0'
 }
 
 package() {
   cd "$_name-$pkgver"
-  python -m installer --destdir="$pkgdir" dist/*.whl
+  /usr/bin/python -m installer --destdir="$pkgdir" dist/*.whl
   install -Dm644 LICENSE.txt "$pkgdir/usr/share/licenses/$pkgname/LICENSE.txt"
   # Includes the bundled data's CC-BY-SA notice and source attributions.
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
