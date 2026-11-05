@@ -8,8 +8,12 @@ Follow-up to the [baseline verification](v2-phase2-2026-11-05.md).
 - **Rendering CPU: improved, not proven to meet the original low-single-digit
   expectation.** Commit `897478b`. That expectation had no stated CPU convention
   or hardware baseline; do not silently reinterpret it as an achieved target.
-- Physical swipe feel, visual fidelity, and battery/thermal impact still require
-  a person to validate. No replacement numerical acceptance limit is assigned here.
+- **Physical usability confirmed by the user after testing:** “everything is
+  working fine and feels natural and smooth.” This closes the subjective swipe
+  feel/smoothness check and supports proceeding to Phase 3 packaging.
+- Battery/thermal impact has not been measured or explicitly confirmed. No
+  replacement numerical CPU acceptance limit is assigned here; the original
+  low-single-digit one-core expectation is not retroactively marked passed.
 
 ## Changes shipped
 
