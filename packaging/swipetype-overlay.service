@@ -1,0 +1,15 @@
+[Unit]
+Description=SwipeType ghost-keyboard overlay
+PartOf=graphical-session.target
+After=graphical-session.target swipetype.service
+Wants=swipetype.service
+
+[Service]
+Type=dbus
+BusName=dev.dishitaghuge.swipetype.overlay
+ExecStart=/usr/bin/swipetype-overlay
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

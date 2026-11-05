@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/python3 /usr/share/swipetype-overlay/swipetype_overlay_toggle.py "$@"

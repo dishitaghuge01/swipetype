@@ -1,0 +1,6 @@
+#!/bin/sh
+# Workarounds are opt-in and hardware-specific; none were needed on the test laptop.
+# export WEBKIT_DISABLE_DMABUF_RENDERER=1
+# export WEBKIT_DISABLE_COMPOSITING_MODE=1
+# Layer-shell is loaded by the host before GTK; do not add LD_PRELOAD globally.
+exec /usr/bin/python3 /usr/share/swipetype-overlay/swipetype_overlay.py "$@"

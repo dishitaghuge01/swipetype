@@ -1,0 +1,17 @@
+pkgbase = python-locate
+	pkgdesc = Locate the directory of the current Python script
+	pkgver = 1.1.1
+	pkgrel = 1
+	url = https://github.com/AutoActuary/locate
+	arch = any
+	license = MIT
+	makedepends = python-build
+	makedepends = python-installer
+	makedepends = python-setuptools
+	makedepends = python-setuptools-scm
+	makedepends = python-wheel
+	depends = python
+	source = https://files.pythonhosted.org/packages/source/l/locate/locate-1.1.1.tar.gz
+	sha256sums = 432750f5b7e89f8c99942ca7d8722ccd1e7954b20e6a973027fccb6cc00af857
+
+pkgname = python-locate

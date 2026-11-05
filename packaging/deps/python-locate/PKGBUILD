@@ -1,0 +1,29 @@
+# Maintainer: Dishita Ghuge <ghugedishita@gmail.com>
+pkgname=python-locate
+_name=locate
+pkgver=1.1.1
+pkgrel=1
+pkgdesc='Locate the directory of the current Python script'
+arch=('any')
+url='https://github.com/AutoActuary/locate'
+license=('MIT')
+depends=('python')
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-setuptools-scm' 'python-wheel')
+source=("https://files.pythonhosted.org/packages/source/l/$_name/$_name-$pkgver.tar.gz")
+sha256sums=('432750f5b7e89f8c99942ca7d8722ccd1e7954b20e6a973027fccb6cc00af857')
+
+build() {
+  cd "$_name-$pkgver"
+  SETUPTOOLS_SCM_PRETEND_VERSION="$pkgver" python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "$_name-$pkgver"
+  PYTHONPATH="$PWD" python -c 'import locate; assert callable(locate.this_dir)'
+}
+
+package() {
+  cd "$_name-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

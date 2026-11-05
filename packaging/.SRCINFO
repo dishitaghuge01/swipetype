@@ -1,0 +1,47 @@
+pkgbase = swipetype-git
+	pkgver = r23.13db1f9
+	pkgrel = 1
+	url = https://github.com/dishitaghuge01/swipetype
+	arch = any
+	license = MIT
+	makedepends = git
+	makedepends = python
+	source = swipetype::git+https://github.com/dishitaghuge01/swipetype.git
+	source = swipetype-daemon
+	source = swipetype-toggle
+	source = swipetype-overlay
+	source = swipetype-overlay-toggle
+	source = swipetype.service
+	source = swipetype-overlay.service
+	source = dev.dishitaghuge.swipetype.overlay.desktop
+	sha256sums = SKIP
+	sha256sums = 32c55edc2e1162fb3eb031a2e94bb162e5c3e0036da73417252aad069a98c854
+	sha256sums = 212fbc8c7f991ee05f379c0ea1e8fe5c75723b89ce72a3dc0d0c40e68771c161
+	sha256sums = 5caaf4ab137538985dc3450462eacb6da97ea22b9c3b19305944169947e71a88
+	sha256sums = 93bbcb7d7ad926d2523df9e9459fac40405dfa89625afd53644cac0c8038b34d
+	sha256sums = 04b4ef9cc7cfa62a5bd245238e24b397d1023889175f91a84d253c9c1d956ce4
+	sha256sums = 89c68cc68186b57af9a7d52e2911510b5b6529feb5f370e693217a1f347b3be9
+	sha256sums = 9a3d75a55a2950e39387203bc5bca67b5c327c5111e1fa28da2fa733d204aaff
+
+pkgname = swipetype-git
+	pkgdesc = System-wide touchpad swipe-to-text daemon for Linux (X11/Wayland)
+	depends = python>=3.10
+	depends = python-evdev>=2.0
+	depends = python-yaml
+	depends = python-wordfreq>=3.1.1
+	optdepends = ydotool: required injection backend for Wayland; configure ydotoold separately
+	optdepends = xdotool: required injection backend for X11
+	optdepends = swipetype-overlay-git: optional live ghost keyboard and trace
+	backup = usr/share/swipetype/config.yaml
+
+pkgname = swipetype-overlay-git
+	pkgdesc = Optional SwipeType WebKitGTK overlay for layer-shell compositors (Sway/Hyprland/river/labwc)
+	depends = swipetype-git
+	depends = python>=3.10
+	depends = python-gobject
+	depends = python-cairo
+	depends = python-yaml
+	depends = gtk4
+	depends = gtk4-layer-shell
+	depends = webkitgtk-6.0
+	depends = systemd

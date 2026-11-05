@@ -1,0 +1,83 @@
+# Maintainer: Dishita Ghuge <ghugedishita@gmail.com>
+pkgbase=swipetype-git
+pkgname=('swipetype-git' 'swipetype-overlay-git')
+pkgver=r23.13db1f9
+pkgrel=1
+arch=('any')
+url='https://github.com/dishitaghuge01/swipetype'
+license=('MIT')
+makedepends=('git' 'python')
+
+# Local development only: SWIPETYPE_SOURCE_URL="file:///absolute/path/to/checkout"
+# Leave unset when generating .SRCINFO for publication.
+_source_url=${SWIPETYPE_SOURCE_URL:-https://github.com/dishitaghuge01/swipetype.git}
+source=("swipetype::git+${_source_url}"
+        'swipetype-daemon'
+        'swipetype-toggle'
+        'swipetype-overlay'
+        'swipetype-overlay-toggle'
+        'swipetype.service'
+        'swipetype-overlay.service'
+        'dev.dishitaghuge.swipetype.overlay.desktop')
+sha256sums=('SKIP'
+            '32c55edc2e1162fb3eb031a2e94bb162e5c3e0036da73417252aad069a98c854'
+            '212fbc8c7f991ee05f379c0ea1e8fe5c75723b89ce72a3dc0d0c40e68771c161'
+            '5caaf4ab137538985dc3450462eacb6da97ea22b9c3b19305944169947e71a88'
+            '93bbcb7d7ad926d2523df9e9459fac40405dfa89625afd53644cac0c8038b34d'
+            '04b4ef9cc7cfa62a5bd245238e24b397d1023889175f91a84d253c9c1d956ce4'
+            '89c68cc68186b57af9a7d52e2911510b5b6529feb5f370e693217a1f347b3be9'
+            '9a3d75a55a2950e39387203bc5bca67b5c327c5111e1fa28da2fa733d204aaff')
+
+pkgver() {
+  cd "$srcdir/swipetype"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+check() {
+  cd "$srcdir/swipetype"
+  # Standard-library tests only: no GTK, touchpad, desktop session or Node needed.
+  python -m unittest discover -s tests -p 'test_*.py' -v
+}
+
+package_swipetype-git() {
+  pkgdesc='System-wide touchpad swipe-to-text daemon for Linux (X11/Wayland)'
+  depends=('python>=3.10' 'python-evdev>=2.0' 'python-yaml' 'python-wordfreq>=3.1.1')
+  optdepends=('ydotool: required injection backend for Wayland; configure ydotoold separately'
+              'xdotool: required injection backend for X11'
+              'swipetype-overlay-git: optional live ghost keyboard and trace')
+  backup=('usr/share/swipetype/config.yaml')
+
+  local module
+  for module in capture decoder gesture inject overlay; do
+    install -dm755 "$pkgdir/usr/share/swipetype/$module"
+    install -m644 "$srcdir/swipetype/$module/"*.py "$pkgdir/usr/share/swipetype/$module/"
+  done
+  install -Dm644 "$srcdir/swipetype/cli/swipetype_toggle.py" \
+    "$pkgdir/usr/share/swipetype/cli/swipetype_toggle.py"
+  install -m644 "$srcdir/swipetype/"{daemon.py,config.py,config.yaml} "$pkgdir/usr/share/swipetype/"
+  install -Dm755 "$srcdir/swipetype-daemon" "$pkgdir/usr/bin/swipetype-daemon"
+  install -Dm755 "$srcdir/swipetype-toggle" "$pkgdir/usr/bin/swipetype-toggle"
+  install -Dm644 "$srcdir/swipetype.service" "$pkgdir/usr/lib/systemd/user/swipetype.service"
+  install -Dm644 "$srcdir/swipetype/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+
+package_swipetype-overlay-git() {
+  pkgdesc='Optional SwipeType WebKitGTK overlay for layer-shell compositors (Sway/Hyprland/river/labwc)'
+  depends=('swipetype-git' 'python>=3.10' 'python-gobject' 'python-cairo' 'python-yaml'
+           'gtk4' 'gtk4-layer-shell' 'webkitgtk-6.0' 'systemd')
+
+  install -Dm644 "$srcdir/swipetype/overlay-app/swipetype_overlay.py" \
+    "$pkgdir/usr/share/swipetype-overlay/swipetype_overlay.py"
+  install -m644 "$srcdir/swipetype/cli/swipetype_overlay_toggle.py" \
+    "$pkgdir/usr/share/swipetype-overlay/swipetype_overlay_toggle.py"
+  cp -r "$srcdir/swipetype/overlay-app/ui" "$pkgdir/usr/share/swipetype-overlay/ui"
+  find "$pkgdir/usr/share/swipetype-overlay/ui" -type d -exec chmod 755 {} +
+  find "$pkgdir/usr/share/swipetype-overlay/ui" -type f -exec chmod 644 {} +
+  install -Dm755 "$srcdir/swipetype-overlay" "$pkgdir/usr/bin/swipetype-overlay"
+  install -Dm755 "$srcdir/swipetype-overlay-toggle" "$pkgdir/usr/bin/swipetype-overlay-toggle"
+  install -Dm644 "$srcdir/swipetype-overlay.service" \
+    "$pkgdir/usr/lib/systemd/user/swipetype-overlay.service"
+  install -Dm644 "$srcdir/dev.dishitaghuge.swipetype.overlay.desktop" \
+    "$pkgdir/usr/share/applications/dev.dishitaghuge.swipetype.overlay.desktop"
+  install -Dm644 "$srcdir/swipetype/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

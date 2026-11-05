@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SwipeType Overlay
+Comment=Optional ghost keyboard and swipe trace
+Exec=swipetype-overlay-toggle
+Icon=input-keyboard
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+Categories=Utility;Accessibility;

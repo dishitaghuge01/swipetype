@@ -1,0 +1,7 @@
+# makepkg work directories and downloaded/build archives, including dependency recipes.
+src/
+pkg/
+swipetype/
+*.pkg.tar.*
+*.src.tar.*
+*.tar.gz
