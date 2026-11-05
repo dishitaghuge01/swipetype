@@ -159,8 +159,11 @@ checksums, `.SRCINFO`, and local development source override are included.
 
 Preflight and dependency validation have started. Split-build dependencies and
 venv-selected Python prefixes were fixed in separate commits, and a corrected
-locate archive passed lint/import checks. Installed app migration and clean-chroot
-checks are pending; do not mark this phase done yet. See the
+locate archive passed lint/import checks. All Python dependencies are now installed;
+both corrected app archives built with normal dependency checks and 28 makepkg
+tests passed. Isolated actual-payload checks also cover foreign-cwd config
+shadowing; the superseded initial candidates were not installed. App installation,
+service migration and clean-chroot checks are pending; do not mark this phase done yet. See the
 [Phase 4 progress record](docs/validation/v2-phase4-2026-11-05.md).
 
 1. `cd packaging && makepkg -si` — watch each of `build()`, `package_swipetype-git()`, `package_swipetype-overlay-git()`.

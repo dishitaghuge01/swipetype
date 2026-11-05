@@ -1,0 +1,27 @@
+Traceback (most recent call last):
+  File "<string>", line 6, in <module>
+    import daemon, config
+  File "/tmp/swipetype-app-payload-a_jc3ue4/usr/share/swipetype/daemon.py", line 37, in <module>
+    from config import load_config
+  File "/tmp/swipetype-app-payload-a_jc3ue4/foreign-cwd/config.py", line 1, in <module>
+    raise RuntimeError("wrong cwd config imported")
+RuntimeError: wrong cwd config imported
+Traceback (most recent call last):
+  File "/home/dishita/swipetype/scratch/check_package_payloads.py", line 133, in <module>
+    main()
+    ~~~~^^
+  File "/home/dishita/swipetype/scratch/check_package_payloads.py", line 129, in main
+    print(json.dumps(check(args.core.resolve(), args.overlay.resolve()), indent=2))
+                     ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dishita/swipetype/scratch/check_package_payloads.py", line 117, in check
+    output = subprocess.check_output(['/usr/bin/python', '-I', '-c', script,
+                                      str(core_dir), str(overlay_dir)], cwd=foreign, text=True)
+  File "/usr/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/usr/bin/python', '-I', '-c', "\nimport sys, json, runpy\nfrom pathlib import Path\ncore, overlay = map(Path, sys.argv[1:3])\nsys.path.insert(0, str(core))\nimport daemon, config\nassert 'gi' not in sys.modules, 'Core imported optional GTK bindings'\nnames = ('daemon','config','capture.touchpad','capture.socket_listener',\n         'decoder.dictionary','decoder.geometry','decoder.resample','decoder.scorer',\n         'gesture.segmenter','inject.base','inject.xdotool_injector',\n         'inject.ydotool_injector','overlay.broadcaster')\nmodules = {name:sys.modules[name].__file__ for name in names}\nassert all(Path(p).is_relative_to(core) for p in modules.values()), modules\nassert Path(config.CONFIG_PATH) == core/'config.yaml'\ncfg=config.load_config()\nassert cfg['device_path'] is None and cfg['ghost_overlay']['enabled'] is True, cfg\nfrom decoder.dictionary import load_dictionary\nfrom decoder.scorer import decode\ndictionary=load_dictionary()\nassert len(dictionary)>25000\nresults={w:decode(dictionary[w]['ideal_path'],dictionary,top_k=1)[0][0]\n         for w in ('hello','world','test','help')}\nassert all(w==v for w,v in results.items()), results\n# Import host definitions only. main() is deliberately not called.\nhost=runpy.run_path(str(overlay/'swipetype_overlay.py'),run_name='phase4_host_import')\nassert Path(host['UI_DIR']) == overlay/'ui', host['UI_DIR']\nhelper=runpy.run_path(str(overlay/'swipetype_overlay_toggle.py'),run_name='phase4_helper_import')\ncommand=helper['overlay_command']()\nassert Path(command[1]) == overlay/'swipetype_overlay.py', command\nprint(json.dumps({'python':sys.executable,'prefix':sys.prefix,'modules':modules,\n                  'dictionary_entries':len(dictionary),'ideal_path_decodes':results,\n                  'overlay_imported':True,'helper_target':command[1]}))\n", '/tmp/swipetype-app-payload-a_jc3ue4/usr/share/swipetype', '/tmp/swipetype-app-payload-a_jc3ue4/usr/share/swipetype-overlay']' returned non-zero exit status 1.

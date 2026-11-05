@@ -3,8 +3,8 @@
 Maintainer: Dishita Ghuge <ghugedishita@gmail.com>.
 
 **Phase 3:** recipes, launchers, services, dependency recipes and `.SRCINFO` are
-prepared. **Phase 4:** dependency-installed builds, namcap, installed runtime tests,
-reinstall and clean-chroot verification remain to be completed. **Phase 5:** AUR
+prepared. **Phase 4:** dependency-resolved builds and archive checks now pass;
+installed application runtime, reinstall and clean-chroot verification remain. **Phase 5:** AUR
 submission is deferred while account registration is closed. No account creation,
 AUR push, pacman installation or upstream Git push was performed here.
 
@@ -89,8 +89,10 @@ CJK extras and optional language-name datasets are not needed for English typing
 Phase 4 has built/linted and verified the system installation of `python-locate`
 after fixing a venv-prefix contamination bug. The reviewed ftfy recipe also built
 successfully (336 passed, 10 expected failures), was installed by the user and
-passes post-install lint/import checks. Wordfreq has now built and passed staged
-English-corpus/decoder checks; its user installation is the next gate. See the [Phase 4 progress record](../docs/validation/v2-phase4-2026-11-05.md)
+passes post-install lint/import checks. Wordfreq is installed and its English
+corpus/decoder checks passed; remaining lint warnings concern optional CJK
+integrations. Both app archives now build without `--nodeps`; their installation
+and service migration are the next gates. See the [Phase 4 progress record](../docs/validation/v2-phase4-2026-11-05.md)
 for current evidence and remaining installation gates.
 
 ## Local app build (no AUR account needed)
@@ -114,7 +116,10 @@ if desired, overlay archive with pacman or `makepkg -si`.
 A limited archive smoke build has already succeeded using `makepkg --nodeps`
 against a local Git clone. **That deliberately skipped dependency checks, installed
 nothing, and is not proof of an installed runtime or a clean-chroot build.** Do
-not use `--nodeps` as the normal installation workflow.
+not use `--nodeps` as the normal installation workflow. Phase 4 has subsequently
+built corrected archives with dependency checks enabled and all 28 makepkg tests
+passing, including a working-directory shadowing regression. See the progress
+record for exact candidate versions/hashes; superseded r31 archives were not installed.
 
 ## Backend and permission setup
 
@@ -194,8 +199,13 @@ silently switch a working development session to untested installed packages.
 ## Validation and Phase 4 checklist
 
 Already checked: Bash/sh syntax, desktop-entry validation, all auxiliary checksums,
-`.SRCINFO` generation, package-function staging/permissions, absence of a copied
-venv/pycache, optional dependency split, and a local `--nodeps` archive smoke build.
+`.SRCINFO` generation, package-function staging/permissions, and dependency-resolved
+application builds. Actual archive checks passed via
+`scratch/check_package_payloads.py CORE.pkg.tar.zst OVERLAY.pkg.tar.zst`: no copied
+venv/pycache, isolated core/overlay imports from a conflicting foreign cwd,
+portable default config, runtime
+split, packaged English data, helper/UI paths, and relative HTML/CSS assets.
+These checks do not start a service/window or replace installed-runtime tests.
 
 Before release:
 

@@ -1,0 +1,9 @@
+swipetype-overlay-git corrected archive lint (not installed yet)
+swipetype-overlay-git W: Referenced python module 'decoder.geometry.KEY_CENTERS' is an uninstalled dependency (needed in files ['usr/share/swipetype-overlay/swipetype_overlay.py'])
+swipetype-overlay-git W: Referenced python module 'config.load_config' is an uninstalled dependency (needed in files ['usr/share/swipetype-overlay/swipetype_overlay.py'])
+swipetype-overlay-git W: Dependency bash detected and implicitly satisfied (programs ['sh'] needed in scripts ['usr/bin/swipetype-overlay', 'usr/bin/swipetype-overlay-toggle'])
+swipetype-overlay-git W: Dependency glib2 detected and implicitly satisfied (python modules ['gi.repository.Gio', 'gi.repository.GLib'] needed in files ['usr/share/swipetype-overlay/swipetype_overlay_toggle.py', 'usr/share/swipetype-overlay/swipetype_overlay.py'])
+swipetype-overlay-git W: Dependency included, but may not be needed ('swipetype-git')
+swipetype-overlay-git W: Dependency included, but may not be needed ('python-yaml')
+swipetype-overlay-git W: Dependency included, but may not be needed ('systemd')
+exit=0

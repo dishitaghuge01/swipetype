@@ -1,0 +1,66 @@
+{
+  "packages": {
+    "swipetype-git": {
+      "archive": "/tmp/swipetype-phase4-app-fixed-gX1kG9/swipetype-git-r34.a8dc766-1-any.pkg.tar.zst",
+      "version": "r34.a8dc766-1",
+      "sha256": "4c22fb9275e4c5f1b637599916086b1d60372deefcd1e11ee61eeb6809667abf",
+      "runtime_dependencies": [
+        "python>=3.10",
+        "python-evdev>=2.0",
+        "python-yaml",
+        "python-wordfreq>=3.1.1"
+      ]
+    },
+    "swipetype-overlay-git": {
+      "archive": "/tmp/swipetype-phase4-app-fixed-gX1kG9/swipetype-overlay-git-r34.a8dc766-1-any.pkg.tar.zst",
+      "version": "r34.a8dc766-1",
+      "sha256": "43326da6093e6028d222f81bd2bbb89c4ef2e95e52bfb9f9269497a9fc0509b0",
+      "runtime_dependencies": [
+        "swipetype-git",
+        "python>=3.10",
+        "python-gobject",
+        "python-cairo",
+        "python-yaml",
+        "gtk4",
+        "gtk4-layer-shell",
+        "webkitgtk-6.0",
+        "systemd"
+      ]
+    }
+  },
+  "imports_and_decoder": {
+    "python": "/usr/bin/python",
+    "prefix": "/usr",
+    "modules": {
+      "daemon": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/daemon.py",
+      "config": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/config.py",
+      "capture.touchpad": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/capture/touchpad.py",
+      "capture.socket_listener": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/capture/socket_listener.py",
+      "decoder.dictionary": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/decoder/dictionary.py",
+      "decoder.geometry": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/decoder/geometry.py",
+      "decoder.resample": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/decoder/resample.py",
+      "decoder.scorer": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/decoder/scorer.py",
+      "gesture.segmenter": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/gesture/segmenter.py",
+      "inject.base": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/inject/base.py",
+      "inject.xdotool_injector": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/inject/xdotool_injector.py",
+      "inject.ydotool_injector": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/inject/ydotool_injector.py",
+      "overlay.broadcaster": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype/overlay/broadcaster.py"
+    },
+    "dictionary_entries": 29152,
+    "ideal_path_decodes": {
+      "hello": "hello",
+      "world": "world",
+      "test": "test",
+      "help": "help"
+    },
+    "overlay_imported": true,
+    "helper_target": "/tmp/swipetype-app-payload-7osg_5kf/usr/share/swipetype-overlay/swipetype_overlay.py"
+  },
+  "relative_html_assets": [
+    "style.css",
+    "demo/keys.js",
+    "demo/demo-path.js",
+    "overlay.js"
+  ],
+  "scope": "Extracted-payload/import/static-asset checks; not installed runtime or network isolation"
+}

@@ -1,0 +1,6 @@
+wordfreq post-install archive lint
+python-wordfreq W: Referenced python module 'mecab_ko_dic' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/mecab.py'])
+python-wordfreq W: Referenced python module 'ipadic' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/mecab.py'])
+python-wordfreq W: Referenced python module 'jieba' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/chinese.py'])
+python-wordfreq W: Referenced python module 'MeCab' is an uninstalled dependency (needed in files ['usr/lib/python3.14/site-packages/wordfreq/mecab.py'])
+exit=0
