@@ -4,8 +4,12 @@
 Run from the checkout: .venv/bin/python scratch/verify_v2_phase2.py
 Requires an unlocked Hyprland 0.57+ (Lua dispatch) session, uinput access,
 ydotoold, and overlay deps. Exits nonzero on observed failures/errors.
-Stop swipetype-overlay.service and any manual overlay first, then restart it
-afterwards: private test sockets do not isolate GApplication's session-bus ID.
+Uses its own D-Bus session, sockets and state; normal services remain running.
+For installed/offline checks set SWIPETYPE_TEST_CORE_ROOT=/usr/share/swipetype,
+SWIPETYPE_TEST_OVERLAY_HOST=/usr/share/swipetype-overlay/swipetype_overlay.py,
+SWIPETYPE_TEST_ISOLATE_OVERLAY=1 and SWIPETYPE_TEST_SKIP_PERF=1.
+Isolation requires bwrap; it masks the checkout and removes network access only
+for the test overlay, not the desktop or normal services.
 DO NOT interact with the desktop while running: synthetic input targets a test
 editor. Focus is checked before gestures/clicks; use only in a disposable session.
 Uses private sockets/config/state; never restarts the user's normal service.
@@ -13,20 +17,25 @@ Results and process logs are retained in a printed temporary directory.
 No production methods are replaced: config lookup is redirected, and an overlay
 subclass adds test-only DOM observation/JavaScript commands.
 """
+import errno
 import importlib.util
 import json
 import os
 from pathlib import Path
 import runpy
 import signal
+import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import time
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+ROOT = Path(os.environ.get('SWIPETYPE_TEST_PROJECT_ROOT', Path(__file__).resolve().parents[1]))
+CORE_ROOT = Path(os.environ.get('SWIPETYPE_TEST_CORE_ROOT', ROOT))
+OVERLAY_HOST = Path(os.environ.get('SWIPETYPE_TEST_OVERLAY_HOST', ROOT / 'overlay-app/swipetype_overlay.py'))
+ISOLATE_OVERLAY = os.environ.get('SWIPETYPE_TEST_ISOLATE_OVERLAY') == '1'
+sys.path.insert(0, str(CORE_ROOT))
 
 
 def store(path, value):
@@ -101,7 +110,7 @@ def editor_role():
 
 def overlay_role():
     redirect_config()
-    module = runpy.run_path(str(ROOT / 'overlay-app/swipetype_overlay.py'), run_name='phase2_overlay')
+    module = runpy.run_path(str(OVERLAY_HOST), run_name='phase2_overlay')
     from gi.repository import GLib
     Base = module['OverlayApp']
 
@@ -112,6 +121,15 @@ def overlay_role():
             self.last_command = 0
             self.dom = None
             self.js_error = None
+            self.isolation = {
+                'net_namespace': os.readlink('/proc/self/ns/net'),
+                'checkout_visible': (ROOT / 'daemon.py').exists(),
+                'host': str(OVERLAY_HOST), 'config_module': __import__('config').__file__,
+            }
+            if ISOLATE_OVERLAY:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                    probe.settimeout(.2)
+                    self.isolation['network_probe_errno'] = probe.connect_ex(('192.0.2.1', 443))
             GLib.timeout_add(200, self.observe)
 
         def _on_load_changed(self, webview, event):
@@ -154,7 +172,7 @@ def overlay_role():
                 'window': self.window is not None, 'loads': self.loads,
                 'layout': self.current_layout, 'dom': self.dom,
                 'command': self.last_command, 'js_error': self.js_error,
-                'pid': os.getpid(),
+                'pid': os.getpid(), 'isolation': self.isolation,
             })
             return True
     app = ObservedOverlay()
@@ -162,6 +180,8 @@ def overlay_role():
 
 
 def runner():
+    if ISOLATE_OVERLAY and (CORE_ROOT == ROOT or os.environ.get('SWIPETYPE_TEST_SKIP_PERF') != '1'):
+        raise ValueError('Overlay isolation requires installed targets and SWIPETYPE_TEST_SKIP_PERF=1')
     from evdev import UInput, AbsInfo, ecodes as E
     from decoder.geometry import KEY_CENTERS
     from decoder.resample import resample_path
@@ -184,7 +204,13 @@ def runner():
         'SWIPETYPE_TEST_OVERLAY_STATE': str(directory / 'overlay.json'),
         'SWIPETYPE_TEST_COMMAND': str(directory / 'command.json'),
         'SWIPETYPE_OVERLAY_DEV': '1', 'PYTHONUNBUFFERED': '1',
+        'SWIPETYPE_TEST_PROJECT_ROOT': str(ROOT),
+        'XDG_CACHE_HOME': str(directory / 'cache'), 'TMPDIR': str(directory / 'tmp'),
+        'DBUS_SESSION_BUS_ADDRESS': f'unix:path={directory}/session-bus',
     })
+    (directory / 'tmp').mkdir()
+    copied_harness = directory / 'test_host.py'
+    shutil.copyfile(Path(__file__).resolve(), copied_harness)
     def interrupted(signum, frame):
         raise KeyboardInterrupt(f'Received signal {signum}')
     signal.signal(signal.SIGTERM, interrupted)
@@ -207,10 +233,14 @@ def runner():
         if role == 'overlay':
             (directory / 'command.json').unlink(missing_ok=True)
         log = open(directory / f'{role}{suffix}.log', 'w')
-        args = [sys.executable, str(Path(__file__).resolve()), role]
+        args = [sys.executable, str(copied_harness), role]
         if role == 'overlay':
-            args.append(str(ROOT / 'overlay-app/swipetype_overlay.py'))
-        proc = subprocess.Popen(args, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+            args.append(str(OVERLAY_HOST))
+            if ISOLATE_OVERLAY:
+                args = ['bwrap', '--unshare-user', '--unshare-net', '--die-with-parent',
+                        '--ro-bind', '/', '/', '--proc', '/proc', '--dev-bind', '/dev', '/dev',
+                        '--bind', str(directory), str(directory), '--tmpfs', str(ROOT), '--'] + args
+        proc = subprocess.Popen(args, cwd=directory, env=env, stdout=log, stderr=subprocess.STDOUT)
         log.close()
         processes.append(proc)
         return proc
@@ -306,6 +336,11 @@ def runner():
         time.sleep(.5)
 
     try:
+        with open(directory / 'session-bus.log', 'w') as log:
+            bus = subprocess.Popen(['dbus-daemon', '--session', '--nofork',
+                f'--address={env["DBUS_SESSION_BUS_ADDRESS"]}'], stdout=log, stderr=subprocess.STDOUT)
+        processes.append(bus)
+        wait_for(lambda: (directory / 'session-bus').exists())
         axes = lambda max_: AbsInfo(0, 0, max_, 0, 0, 10)
         caps = {
             E.EV_KEY: [E.BTN_TOUCH, E.BTN_TOOL_FINGER, E.BTN_LEFT],
@@ -320,6 +355,8 @@ def runner():
             'session': os.environ.get('XDG_SESSION_TYPE'),
             'desktop': os.environ.get('XDG_CURRENT_DESKTOP'),
             'virtual_touchpad': ui.device.path, 'python': sys.version,
+            'core_root': str(CORE_ROOT), 'overlay_host': str(OVERLAY_HOST),
+            'private_dbus': True, 'isolated_overlay': ISOLATE_OVERLAY,
             'note': 'Synthetic gestures; separate daemon; temporary config/runtime/layout. DEV diagnostics enabled.',
         })
         editor = launch('editor')
@@ -329,6 +366,16 @@ def runner():
         wait_for(lambda: (directory / 'runtime/swipetype.sock').exists(), 60)
         overlay = launch('overlay')
         wait_for(ready, 30)
+        if ISOLATE_OVERLAY:
+            isolation = state()['isolation']
+            record('installed_offline_overlay_isolation', 'PASS' if
+                not isolation['checkout_visible']
+                and isolation['network_probe_errno'] in (errno.ENETUNREACH, errno.EHOSTUNREACH)
+                and isolation['net_namespace'] != os.readlink('/proc/self/ns/net')
+                and isolation['config_module'].startswith(str(CORE_ROOT) + '/') else 'FAIL',
+                **isolation)
+            if results[-1]['status'] != 'PASS':
+                raise RuntimeError('Overlay isolation gate failed; refusing input test')
         time.sleep(2)
         toggle()
         wait_for(lambda: dom().get('mode') == 'swipe')
@@ -369,8 +416,7 @@ def runner():
         subprocess.run(['ydotool', 'key', '29:1', '107:1', '107:0', '29:0'], check=True)
         time.sleep(.2)
 
-        subprocess.run(['gapplication', 'action', 'dev.dishitaghuge.swipetype.overlay',
-                        'toggle-overlay'], check=True)
+        subprocess.run([sys.executable, str(OVERLAY_HOST), '--toggle'], check=True, env=env)
         wait_for(lambda: dom().get('mode') == 'idle')
         before = text()
         hidden_points = dom().get('points')
@@ -380,8 +426,7 @@ def runner():
                'PASS' if text() == before + 'hello ' and dom().get('points') == hidden_points
                and dom().get('strokes') == hidden_strokes else 'FAIL',
                before=before, actual=text(), points=dom().get('points'), strokes=dom().get('strokes'))
-        subprocess.run(['gapplication', 'action', 'dev.dishitaghuge.swipetype.overlay',
-                        'toggle-overlay'], check=True)
+        subprocess.run([sys.executable, str(OVERLAY_HOST), '--toggle'], check=True, env=env)
         wait_for(lambda: dom().get('mode') == 'swipe')
 
         stop(overlay)
@@ -459,12 +504,12 @@ def runner():
         config(False)
         (directory / 'overlay.json').unlink(missing_ok=True)
         overlay = launch('overlay', '-disabled')
-        wait_for(lambda: state().get('pid') == overlay.pid)
+        wait_for(lambda: state().get('pid'))
         time.sleep(3)
         descendants = measure.descendants(overlay.pid)
         helpers = [(pid, measure.read_stat(pid)[0]) for pid in descendants if measure.read_stat(pid)]
         record('disabled_overlay_no_webkit_helpers',
-               'PASS' if not state().get('window') and len(descendants) == 1 else 'FAIL',
+               'PASS' if not state().get('window') and not any('WebKit' in name for _, name in helpers) else 'FAIL',
                window=state().get('window'), processes=helpers)
         before = text()
         toggle()
@@ -475,16 +520,19 @@ def runner():
         stop(overlay)
         config(True)
         layout_path.unlink(missing_ok=True)
+        if os.environ.get('SWIPETYPE_TEST_SKIP_PERF') == '1':
+            record('performance', 'SKIPPED', reason='Installed correctness run; prior CPU measurements retained')
+            return 1 if any(r['status'] in ('FAIL', 'ERROR') for r in results) else 0
         # Uninstrumented production host for performance figures.
         perf_env = env.copy()
         perf_env.pop('SWIPETYPE_OVERLAY_DEV', None)
         log = open(directory / 'overlay-performance.log', 'w')
-        bootstrap = ('import sys,runpy;sys.path.insert(0,' + repr(str(ROOT)) + ');'
+        bootstrap = ('import sys,runpy;sys.path.insert(0,' + repr(str(CORE_ROOT)) + ');'
                      'import config;original=config.load_config;'
                      'config.load_config=lambda:original(' + repr(str(directory / 'config.yaml')) + ');'
                      'runpy.run_path(sys.argv[1],run_name="__main__")')
         overlay = subprocess.Popen([sys.executable, '-c', bootstrap,
-                                    str(ROOT / 'overlay-app/swipetype_overlay.py')],
+                                    str(OVERLAY_HOST)],
                                    cwd=ROOT, env=perf_env, stdout=log, stderr=subprocess.STDOUT)
         log.close()
         processes.append(overlay)
@@ -533,6 +581,6 @@ if __name__ == '__main__':
         overlay_role()
     elif role == 'daemon':
         redirect_config()
-        runpy.run_path(str(ROOT / 'daemon.py'), run_name='__main__')
+        runpy.run_path(str(CORE_ROOT / 'daemon.py'), run_name='__main__')
     else:
         sys.exit(runner())
