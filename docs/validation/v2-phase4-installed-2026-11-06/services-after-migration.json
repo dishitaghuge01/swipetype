@@ -1,0 +1,18 @@
+{
+  "swipetype.service": {
+    "ActiveState": "active",
+    "FragmentPath": "/usr/lib/systemd/user/swipetype.service",
+    "InvocationID": "fb58831fbff045c288728b4e72e91146",
+    "MainPID": "3889",
+    "command": "/usr/bin/python3 /usr/share/swipetype/daemon.py",
+    "cwd": "/home/dishita"
+  },
+  "swipetype-overlay.service": {
+    "ActiveState": "active",
+    "FragmentPath": "/usr/lib/systemd/user/swipetype-overlay.service",
+    "InvocationID": "389a1b3b9da845179278d0bb4393d756",
+    "MainPID": "3890",
+    "command": "/usr/bin/python3 /usr/share/swipetype-overlay/swipetype_overlay.py",
+    "cwd": "/home/dishita"
+  }
+}

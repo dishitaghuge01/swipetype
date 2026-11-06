@@ -1,0 +1,21 @@
+Evidence directory: /tmp/swipetype-phase2-iclmdxjh
+{"test": "installed_offline_overlay_isolation", "status": "PASS", "net_namespace": "net:[4026532873]", "checkout_visible": false, "host": "/usr/share/swipetype-overlay/swipetype_overlay.py", "config_module": "/usr/share/swipetype/config.py", "network_probe_errno": 101}
+{"test": "words_with_overlay", "status": "PASS", "expected": "hello world ", "actual": "hello world ", "overlay": {"mode": "swipe", "opacity": "1", "points": 138, "strokes": 1459, "keys": 26, "rect": {"x": 0, "y": 227.4375, "w": 1920, "h": 625.109375, "vw": 1920, "vh": 1080}}}
+{"test": "live_trace_rendering", "status": "PASS", "points": 138, "strokes": 1459}
+{"test": "one_finger_character_delete", "status": "PASS", "actual": "hello world"}
+{"test": "two_finger_word_delete_after_character_delete", "status": "PASS", "actual": "hello "}
+{"test": "focus_during_typing", "status": "PASS", "editor": {"text": "hello ", "clicks": 0, "active": true, "focus": true, "pid": 9849}}
+{"test": "click_through", "status": "PASS", "before_clicks": 0, "editor": {"text": "hello ", "clicks": 1, "active": true, "focus": true, "pid": 9849}}
+{"test": "hidden_overlay_does_not_render", "status": "PASS", "before": "hello ", "actual": "hello hello ", "points": 171, "strokes": 1711}
+{"test": "typing_after_overlay_exit", "status": "PASS", "before": "hello hello ", "actual": "hello hello test ", "daemon_alive": true}
+{"test": "overlay_connects_during_swipe_mode", "status": "PASS", "expected": "swipe", "actual": "swipe"}
+{"test": "webkit_crash_recovery", "status": "PASS", "killed": [10193], "replacement": [10259], "loads": 2, "trace": {"mode": "swipe", "opacity": "1", "points": 69, "strokes": 445, "keys": 26, "rect": {"x": 0, "y": 227.4375, "w": 1920, "h": 625.109375, "vw": 1920, "vh": 1080}}, "daemon_alive": true, "before": "hello hello test ", "actual": "hello hello test hello "}
+{"test": "daemon_disconnect_visual_state", "status": "PASS", "expected": "idle", "overlay_mode": "idle"}
+{"test": "daemon_restart_initial_mode", "status": "PASS", "expected": "idle", "actual": "idle"}
+{"test": "daemon_restart_reconnect", "status": "PASS", "actual": "hello hello test hello world ", "before": "hello hello test hello ", "overlay_pid": 10160, "overlay": {"mode": "swipe", "opacity": "1", "points": 138, "strokes": 1206, "keys": 26, "rect": {"x": 0, "y": 227.4375, "w": 1920, "h": 625.109375, "vw": 1920, "vh": 1080}}}
+{"test": "layout_survives_restart", "status": "PASS", "saved_file": {"version": 1, "cx": 0.42, "cy": 0.44, "w": 0.65}, "restored": {"cx": 0.42, "cy": 0.44, "w": 0.65}, "rendered_rect": {"x": 182.390625, "y": 272.03125, "w": 1248, "h": 406.3125, "vw": 1920, "vh": 1080}, "method": "Real JS bridge layout message; physical drag not tested"}
+{"test": "corrupt_layout_fallback", "status": "PASS", "restored": null, "rendered_rect": {"x": 0, "y": 227.4375, "w": 1920, "h": 625.109375, "vw": 1920, "vh": 1080}}
+{"test": "disabled_overlay_no_webkit_helpers", "status": "PASS", "window": false, "processes": [[10530, "bwrap"], [10531, "python"]]}
+{"test": "typing_with_disabled_overlay", "status": "PASS", "before": "hello hello test hello world ", "actual": "hello hello test hello world test ", "window": false}
+{"test": "performance", "status": "SKIPPED", "reason": "Installed correctness run; prior CPU measurements retained"}
+Results retained in /tmp/swipetype-phase2-iclmdxjh

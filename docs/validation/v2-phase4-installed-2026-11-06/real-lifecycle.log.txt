@@ -1,0 +1,1 @@
+PASS: helper cold/warm and daemon restart; core 3889 -> 16419; overlay 3890 -> 16290, retained through daemon restart

@@ -1,0 +1,17 @@
+{
+  "python": "/usr/bin/python3",
+  "prefix": "/usr",
+  "daemon": "/usr/share/swipetype/daemon.py",
+  "config": "/usr/share/swipetype/config.py",
+  "wordfreq": "/usr/lib/python3.14/site-packages/wordfreq/__init__.py",
+  "evdev": "/usr/lib/python3.14/site-packages/evdev/__init__.py",
+  "yaml": "/usr/lib/python3.14/site-packages/yaml/__init__.py",
+  "dictionary_entries": 29152,
+  "config_values": {
+    "device_path": null,
+    "ghost_overlay": {
+      "enabled": true
+    }
+  },
+  "ui_dir": "/usr/share/swipetype-overlay/ui"
+}

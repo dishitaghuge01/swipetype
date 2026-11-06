@@ -1,0 +1,5 @@
+{
+  "status": "PASS",
+  "case": "Missing vendor units; stop/disable fail; saved checkout units still restored",
+  "real_services_controlled": false
+}

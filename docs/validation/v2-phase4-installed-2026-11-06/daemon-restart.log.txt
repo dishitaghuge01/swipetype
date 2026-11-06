@@ -1,0 +1,17 @@
+Using touchpad device: /dev/input/event17
+Loading dictionary (top 30k English words via wordfreq)...
+Dictionary loaded: 29152 words.
+Session type: wayland -> using ydotool for injection.
+Socket listening at: /tmp/swipetype-phase2-iclmdxjh/runtime/swipetype.sock
+Overlay socket listening at: /tmp/swipetype-phase2-iclmdxjh/runtime/swipetype-overlay.sock
+Daemon idle. Run cli/swipetype_toggle.py to switch modes.
+[toggle] now: SWIPE_MODE (grabbed)
+  WORD: 'world'  (dt=568ms, path_len=22.66)
+    top-5: world(1.16), worked(1.82), would(2.15), works(2.19), worried(2.25)
+[toggle] now: IDLE (ungrabbed)
+[toggle] now: SWIPE_MODE (grabbed)
+  WORD: 'test'  (dt=569ms, path_len=6.12)
+    top-5: test(1.33), that(1.79), text(1.82), treat(1.93), great(1.98)
+[toggle] now: IDLE (ungrabbed)
+
+Received signal 15, stopping.

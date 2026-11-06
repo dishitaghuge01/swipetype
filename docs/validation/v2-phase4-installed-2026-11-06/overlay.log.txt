@@ -1,0 +1,27 @@
+
+(python:9936): Gtk-WARNING **: 09:38:06.745: Theme parser error: gtk.css:1:1-31: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita.css: No such file or directory
+
+(python:9936): Gtk-WARNING **: 09:38:06.745: Theme parser error: gtk.css:2:1-38: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita-tweaks.css: No such file or directory
+[swipetype-overlay] connected to daemon overlay socket.
+[swipetype-overlay] LayerShell.is_layer_window() -> True
+
+(python:9936): Gdk-WARNING **: 09:38:06.870: Vulkan: Loader Message: setup_loader_term_phys_devs:  Failed to detect any valid GPUs in the current config
+
+(python:9936): Gdk-WARNING **: 09:38:06.870: vkEnumeratePhysicalDevices(): Initialization of an object could not be completed for implementation-specific reasons. (VK_ERROR_INITIALIZATION_FAILED) (-3)
+[swipetype-overlay] dev mode: watching /usr/share/swipetype-overlay/ui for changes (hot reload).
+[swipetype-overlay] daemon mode -> idle
+
+(python:9936): Gtk-CRITICAL **: 09:38:06.916: Unable to register the application: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: Could not activate remote peer 'org.a11y.atspi.Registry': unit failed
+
+(python:9936): Gtk-CRITICAL **: 09:38:07.088: Unable to register the application: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: Could not activate remote peer 'org.a11y.atspi.Registry': unit failed
+
+** (process:2): WARNING **: 09:38:07.107: Failed to get atspi registered event listeners: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: Could not activate remote peer 'org.a11y.atspi.Registry': unit failed
+
+[swipetype-overlay] page load FINISHED; init() sent (saved layout: None).
+[swipetype-overlay] daemon mode -> swipe
+[swipetype-overlay] flushing 2 event(s) to JS: ['clear', 'point']
+[swipetype-overlay] flushing 1 event(s) to JS: ['commit']
+[swipetype-overlay] flushing 2 event(s) to JS: ['clear', 'point']
+[swipetype-overlay] flushing 1 event(s) to JS: ['commit']
+[swipetype-overlay] flushing 4 event(s) to JS: ['clear', 'point', 'point', 'point']
+[swipetype-overlay] flushing 7 event(s) to JS: ['clear', 'point', 'point', 'point', 'point', 'point', 'point']

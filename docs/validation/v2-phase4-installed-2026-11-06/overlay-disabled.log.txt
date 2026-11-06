@@ -1,0 +1,9 @@
+
+(python:10531): Gtk-WARNING **: 09:38:37.429: Theme parser error: gtk.css:1:1-31: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita.css: No such file or directory
+
+(python:10531): Gtk-WARNING **: 09:38:37.429: Theme parser error: gtk.css:2:1-38: Failed to import: Error opening file /home/dishita/.config/gtk-4.0/libadwaita-tweaks.css: No such file or directory
+[swipetype-overlay] ghost_overlay.enabled is false -- no window / WebKit processes created.
+[swipetype-overlay] connected to daemon overlay socket.
+[swipetype-overlay] daemon mode -> idle
+[swipetype-overlay] daemon mode -> swipe
+[swipetype-overlay] daemon mode -> idle

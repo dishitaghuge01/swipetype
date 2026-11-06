@@ -4,7 +4,9 @@ Maintainer: Dishita Ghuge <ghugedishita@gmail.com>.
 
 **Phase 3:** recipes, launchers, services, dependency recipes and `.SRCINFO` are
 prepared. **Phase 4:** dependency-resolved builds and archive checks now pass;
-installed application runtime, reinstall and clean-chroot verification remain. **Phase 5:** AUR
+installed service/runtime checks also pass. Same-version reinstall and final
+physical shortcut confirmation remain for original Phase 4; clean-chroot testing
+is separately tracked pre-publication hardening. **Phase 5:** AUR
 submission is deferred while account registration is closed. No account creation,
 AUR push, pacman installation or upstream Git push was performed here.
 
@@ -205,7 +207,13 @@ application builds. Actual archive checks passed via
 venv/pycache, isolated core/overlay imports from a conflicting foreign cwd,
 portable default config, runtime
 split, packaged English data, helper/UI paths, and relative HTML/CSS assets.
-These checks do not start a service/window or replace installed-runtime tests.
+These archive checks do not start a service/window. Subsequent installed-code
+integration checks passed in a private session bus, including a network-isolated
+overlay with the checkout masked. See the [installed runtime report](../docs/validation/v2-phase4-installed-2026-11-06.md).
+For the final interactive reinstall gate, `scratch/reinstall_packages.sh` requires
+reviewed same-version archives and the prepared user-unit rollback directory;
+read its help/header before running. It uses interactive sudo, not automatic
+confirmation, and does not remove dependency packages.
 
 Before release:
 

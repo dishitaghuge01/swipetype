@@ -82,10 +82,11 @@ These checks do not need hardware/GTK or an npm install. Optional integration
 and CPU tools are documented in
 [the verification report](docs/validation/v2-phase2-fixes-2026-11-05.md).
 The desktop integration script injects actual input and must run unattended.
-Before integration/replay/manual-dev runs, stop `swipetype-overlay.service` and
-any manual overlay: GApplication deliberately allows one overlay owner per
-session bus. Restart the service afterward. Private test sockets alone do not
-isolate that application identity.
+The integration harness now creates its own session bus, so normal services can
+remain running (pause desktop interaction during input tests). Its installed-mode
+options can mask the checkout and disable networking for the test overlay.
+For the separate replay profiler or manual dev runs, still stop any existing
+overlay first: GApplication allows one owner per session bus. Restart afterward.
 
 Recognition is an English dictionary/template matcher, not a contextual language
 model. Words are lowercase with trailing spaces; no punctuation/capitalization
