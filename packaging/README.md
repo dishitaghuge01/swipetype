@@ -3,12 +3,14 @@
 Maintainer: Dishita Ghuge <ghugedishita@gmail.com>.
 
 **Phase 3:** recipes, launchers, services, dependency recipes and `.SRCINFO` are
-prepared. **Phase 4:** dependency-resolved builds and archive checks now pass;
-installed service/runtime checks also pass. Same-version reinstall and final
-physical shortcut confirmation remain for original Phase 4; clean-chroot testing
-is separately tracked pre-publication hardening. **Phase 5:** AUR
-submission is deferred while account registration is closed. No account creation,
-AUR push, pacman installation or upstream Git push was performed here.
+prepared. **Phase 4 is complete locally** on the tested Arch/Hyprland laptop:
+dependency-resolved builds, installed runtime, uninstall/reinstall, repeated
+clean-build payload comparison and final physical confirmation passed. See the
+[sign-off and scope](../docs/validation/v2-phase4-installed-2026-11-06.md).
+Clean-chroot testing remains separate pre-publication hardening. **Phase 5:** AUR
+submission is deferred while registration is closed. No account creation, AUR
+push or upstream Git push was performed. Privileged package installs/removals
+were run explicitly by the user in their terminal.
 
 ## Design and deliberate changes from the sample PRD
 

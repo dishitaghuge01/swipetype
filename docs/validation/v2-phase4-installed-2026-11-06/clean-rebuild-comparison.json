@@ -1,0 +1,13 @@
+{
+  "swipetype-git": {
+    "status": "PASS",
+    "payload_entries": 33,
+    "file_bytes_and_modes_identical": true
+  },
+  "swipetype-overlay-git": {
+    "status": "PASS",
+    "payload_entries": 24,
+    "file_bytes_and_modes_identical": true
+  },
+  "scope": "Shipped usr/ file contents and modes; excludes build metadata/timestamps. Not a byte-for-byte archive reproducibility or clean-chroot claim."
+}

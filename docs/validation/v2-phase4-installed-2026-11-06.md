@@ -2,11 +2,11 @@
 
 ## Status
 
-Installed package/service and isolated functional checks passed. **Phase 4 is
-not signed off yet:** the interactive uninstall/reinstall test and final physical
-shortcut confirmation remain. Clean-chroot testing is tracked separately as
-additional pre-publication hardening, not silently added to the original v2
-Phase 4 scope. AUR publication remains deferred.
+**Original v2 Phase 4 is complete for the tested Arch/Hyprland laptop.**
+Installed service/runtime checks, same-version uninstall/reinstall, a repeated
+clean build/payload comparison, and final user confirmation all passed.
+Clean-chroot testing remains separately tracked pre-publication hardening, not a
+claim made by this sign-off. AUR publication remains deferred.
 
 Packages: `swipetype-git` and `swipetype-overlay-git`, both `r34.a8dc766-1`,
 built from the local repository, not unpublished GitHub changes. `pacman -Qkk`
@@ -87,8 +87,9 @@ installed helper twice. Both commands succeeded; cold start created a managed
 installed process and warm invocation reused it. Then restarted the real daemon:
 its PID changed while the real overlay PID stayed the same. Both services were
 active and the new daemon socket reported idle. No typing was injected in these
-live lifecycle checks. Physical keypress confirmation is still requested from
-the user; invoking the helper is not a synthetic test of the modifier binding.
+live lifecycle checks. After the reinstall, the user confirmed that all
+shortcuts, swipes, etc. work well, completing the physical-use check separately
+from the programmatic helper checks.
 
 ## Reinstall gate
 
@@ -103,8 +104,32 @@ terminal; no automatic confirmation or privilege-policy change is used.
 On cancellation/failure it attempts the prepared checkout rollback. The rollback
 was adjusted to restore saved units even if vendor unit names are absent after
 removal. A fake-HOME/mock-command test passed that failure path without touching
-real services. Guard code and shell syntax passed; **actual uninstall/reinstall
-has not run yet**.
+real services. The user then ran the real interactive test successfully. Its
+receipt reports **PASS** for same versions, active vendor services, config and
+layout preservation; the removal receipt confirms managed application files were
+removed before reinstalling. Follow-up checks verified both packages remain
+`r34.a8dc766-1`, with **0 altered files**, both services enabled/active under
+`/usr/lib/systemd/user`, and no Hyprland configuration errors.
+
+## Repeated clean build
+
+After reinstall, rebuilt the exact tested source with
+`SWIPETYPE_SOURCE_URL=file:///home/dishita/swipetype#commit=a8dc766`, normal
+dependency checks and a fresh source/build directory. The build passed. Compared
+all shipped `usr/` file contents and modes with the installed candidates: **both
+payloads match exactly** (33 core entries, 24 overlay entries beneath `usr/`).
+This excludes build metadata/timestamps: it is not a byte-for-byte archive
+reproducibility or clean-chroot claim. No further installation was needed for
+this comparison.
+
+## Remaining release work (outside this local sign-off)
+
+- Clean-chroot and broader-machine/session testing remain additional hardening.
+- X11/aarch64, a real post-migration logout/login and battery/thermal benchmarking
+  are not claimed tested here.
+- Review/push the local commits before testing the default public GitHub source.
+  No push was performed; AUR registration/publication remains deferred.
+- Existing documented recognition/history and platform limitations still apply.
 
 Evidence: [installed run artifacts](v2-phase4-installed-2026-11-06/), plus the
 [earlier package build record](v2-phase4-2026-11-05.md).

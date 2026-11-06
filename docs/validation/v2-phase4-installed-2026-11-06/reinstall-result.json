@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "same_versions": true,
+  "services_active": true,
+  "vendor_units": true,
+  "config_preserved": true,
+  "layout_preserved": true
+}

@@ -35,7 +35,7 @@ has been attempted. Maintainer email: ghugedishita@gmail.com.
 | Phase 2, steps 1–4 (deps, broadcaster, segmenter hooks, daemon wiring) | ✅ untouched; one 🆕 dependency install (`webkitgtk-6.0`) |
 | Phase 2, step 5 (GTK4 DrawingArea client) | 🔁 **replaced** by stages 2a–2h below |
 | Phase 3 (PKGBUILD) | 🟢 authored, staged and archive-smoke-tested locally; see `packaging/` |
-| Phase 4 (local build/test) | ⏳ modified: more to verify (web process, UI paths, RAM) |
+| Phase 4 (local build/test) | 🟢 completed locally on Arch/Hyprland; uninstall/reinstall and physical confirmation passed |
 | Phase 5 (AUR submission) | ⏸ registration closed; metadata prepared, no submission |
 | Phase 6 (maintenance notes) | ⏳ unchanged + two new notes |
 
@@ -155,7 +155,7 @@ checksums, `.SRCINFO`, and local development source override are included.
 3. 🆕 Confirm the overlay subpackage now has `webkitgtk-6.0` and `python-cairo` in `depends`, installs `swipetype_overlay.py` **and** `ui/` into `/usr/share/swipetype-overlay/`, and installs the launcher to `/usr/bin/swipetype-overlay`. Confirm no `package_*()` function references the old direct-to-`/usr/bin` install of the Python file.
 4. If Path B (no overlay on your machine): still include the overlay subpackage; note in `pkgdesc` or a comment that you haven't personally tested it running.
 
-## Phase 4 — local build and test via makepkg ⏳ (in progress)
+## Phase 4 — local build and test via makepkg 🟢 (completed locally, 2026-11-06)
 
 Preflight and dependency validation have started. Split-build dependencies and
 venv-selected Python prefixes were fixed in separate commits, and a corrected
@@ -164,9 +164,10 @@ both corrected app archives built with normal dependency checks and 28 makepkg
 tests passed. Isolated actual-payload checks also cover foreign-cwd config
 shadowing; the superseded initial candidates were not installed. App installation
 and vendor-service migration now passed, alongside 18 isolated installed-runtime
-checks including offline rendering with the checkout masked. Original Phase 4
-still awaits same-version reinstall and final physical shortcut confirmation;
-clean-chroot work is separately tracked release hardening. See the
+checks including offline rendering with the checkout masked. Same-version
+uninstall/reinstall, repeated clean-build payload comparison, and final physical
+shortcut/swipe confirmation have now passed. Original Phase 4 is complete for
+this laptop; clean-chroot work is separately tracked release hardening. See the
 [installed-run report](docs/validation/v2-phase4-installed-2026-11-06.md).
 
 1. `cd packaging && makepkg -si` — watch each of `build()`, `package_swipetype-git()`, `package_swipetype-overlay-git()`.

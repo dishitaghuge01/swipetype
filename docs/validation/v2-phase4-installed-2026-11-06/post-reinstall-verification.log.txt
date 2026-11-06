@@ -1,0 +1,17 @@
+swipetype-git r34.a8dc766-1
+swipetype-overlay-git r34.a8dc766-1
+swipetype-git: 34 total files, 0 altered files
+swipetype-overlay-git: 25 total files, 0 altered files
+Id=swipetype.service
+ActiveState=active
+FragmentPath=/usr/lib/systemd/user/swipetype.service
+UnitFileState=enabled
+MainPID=21267
+
+Id=swipetype-overlay.service
+ActiveState=active
+FragmentPath=/usr/lib/systemd/user/swipetype-overlay.service
+UnitFileState=enabled
+MainPID=21268
+
+

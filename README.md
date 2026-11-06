@@ -19,6 +19,9 @@ Sway, river or labwc. GNOME/KDE overlay support is out of scope.
 - Local recipes for missing `python-locate` and `python-wordfreq` dependencies
   are included under `packaging/deps/`.
 
+Local v2 Phase 4 validation is complete on the tested Arch/Hyprland laptop;
+see the [sign-off and limits](docs/validation/v2-phase4-installed-2026-11-06.md).
+
 **AUR submission is deferred while registration is closed.** Recipes and `.SRCINFO`
 are prepared locally; no AUR availability is claimed. Local builds do not require
 an AUR account. Full dependency-installed/package-installed testing is a separate
